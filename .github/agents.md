@@ -28,3 +28,10 @@ Core goal: Eliminate the Split-Attention Effect and Jargon Wall by providing inl
 3. **API Contract:**
    - `POST /api/lens`: Input `{ "text": str, "lens_type": "intuition" | "eli5" | "math", "context": dict | null }`. Output `{ "success": bool, "lens_type": str, "explanation": str }`.
    - `POST /api/prebake`: Input `{ "paper_id": str, "content": str }`. Output `{ "symbols": dict, "anchors": dict }`.
+
+## Development & Version Control Workflow
+1. **Strictly No Automatic Commits:** The agent must never automatically stage or commit code or file modifications.
+2. **Review First:** All edits must remain uncommitted in the working tree for user inspection, verification, and testing.
+3. **User-Driven Save & Commit:**
+   - Only stage and commit when explicitly commanded by the user with their notes or message.
+   - If the user rejects the changes, revert cleanly upon instruction using git restore/clean.
