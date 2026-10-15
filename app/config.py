@@ -13,3 +13,9 @@ load_dotenv(dotenv_path=_env_path)
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 HOST: str = os.getenv("HOST", "127.0.0.1")
 PORT: int = int(os.getenv("PORT", "8000"))
+
+
+def get_gemini_api_key() -> str:
+    """Read the latest GEMINI_API_KEY directly from .env file or environment."""
+    load_dotenv(dotenv_path=_env_path, override=True)
+    return os.getenv("GEMINI_API_KEY", "").strip()

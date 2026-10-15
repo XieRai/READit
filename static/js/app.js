@@ -727,20 +727,86 @@
     renderActiveDocument();
   }
 
+  let draggedFileId = null;
+
   function renderTabs() {
     if (!tabsContainer) return;
 
     tabsContainer.innerHTML = state.openFiles.map((file) => {
       const isActive = file.id === state.activeFileId;
       return `
-        <div class="tab-pill flex items-center rounded-full border ${isActive ? "border-blue-200 bg-blue-50" : "border-zinc-200 bg-white"} shadow-sm">
-          <button type="button" class="tab-btn max-w-[180px] truncate px-3 py-2 text-sm font-medium ${isActive ? "text-blue-700" : "text-zinc-600"}" data-tab-id="${file.id}">
+        <div id="tab-pill-${file.id}"
+             draggable="true"
+             class="tab-pill flex items-center rounded-full border cursor-grab active:cursor-grabbing transition-all ${isActive ? "border-blue-300 dark:border-emerald-500 bg-blue-50 dark:bg-emerald-950/40 text-blue-700 dark:text-emerald-300 shadow-sm" : "border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"}"
+             data-file-id="${file.id}">
+          <button type="button" class="tab-btn max-w-[180px] truncate px-3 py-1.5 text-xs sm:text-sm font-medium ${isActive ? "text-blue-700 dark:text-emerald-300" : "text-zinc-600 dark:text-zinc-300"}" data-tab-id="${file.id}">
             ${escapeHtml(file.title)}
           </button>
-          <button type="button" class="tab-close ${state.openFiles.length === 1 ? "hidden" : ""} rounded-r-full px-2 py-2 text-xs text-zinc-500 hover:text-zinc-800" data-close-id="${file.id}" aria-label="Close tab">✕</button>
+          <button type="button" class="tab-close ${state.openFiles.length === 1 ? "hidden" : ""} rounded-r-full pr-2.5 pl-1 py-1.5 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition" data-close-id="${file.id}" aria-label="Close tab">✕</button>
         </div>
       `;
     }).join("");
+
+    tabsContainer.querySelectorAll(".tab-pill").forEach((pill) => {
+      const fileId = pill.dataset.fileId;
+
+      pill.addEventListener("dragstart", (e) => {
+        draggedFileId = fileId;
+        e.dataTransfer.setData("text/plain", fileId);
+        e.dataTransfer.effectAllowed = "move";
+        requestAnimationFrame(() => pill.classList.add("opacity-40", "scale-95"));
+      });
+
+      pill.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (!draggedFileId || draggedFileId === fileId) return;
+
+        const rect = pill.getBoundingClientRect();
+        const isLeft = e.clientX < rect.left + rect.width / 2;
+        pill.classList.toggle("border-l-2", isLeft);
+        pill.classList.toggle("border-l-blue-500", isLeft);
+        pill.classList.toggle("border-r-2", !isLeft);
+        pill.classList.toggle("border-r-blue-500", !isLeft);
+      });
+
+      pill.addEventListener("dragleave", () => {
+        pill.classList.remove("border-l-2", "border-l-blue-500", "border-r-2", "border-r-blue-500");
+      });
+
+      pill.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        pill.classList.remove("border-l-2", "border-l-blue-500", "border-r-2", "border-r-blue-500");
+
+        if (!draggedFileId || draggedFileId === fileId) {
+          draggedFileId = null;
+          return;
+        }
+
+        const rect = pill.getBoundingClientRect();
+        const insertBefore = e.clientX < rect.left + rect.width / 2;
+
+        const fromIndex = state.openFiles.findIndex((f) => f.id === draggedFileId);
+        let toIndex = state.openFiles.findIndex((f) => f.id === fileId);
+
+        if (fromIndex !== -1 && toIndex !== -1) {
+          const [moved] = state.openFiles.splice(fromIndex, 1);
+          let targetIndex = state.openFiles.findIndex((f) => f.id === fileId);
+          if (!insertBefore) targetIndex += 1;
+          const finalIndex = Math.max(0, Math.min(state.openFiles.length, targetIndex));
+          state.openFiles.splice(finalIndex, 0, moved);
+        }
+
+        draggedFileId = null;
+        renderTabs();
+      });
+
+      pill.addEventListener("dragend", () => {
+        pill.classList.remove("opacity-40", "scale-95", "border-l-2", "border-l-blue-500", "border-r-2", "border-r-blue-500");
+        draggedFileId = null;
+      });
+    });
 
     tabsContainer.querySelectorAll(".tab-btn").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1105,8 +1171,20 @@
     bindSelectionPalette();
     bindLensButtons();
     bindFileControls();
-    updateReadingProgress();
-  }
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "q" || e.key === "Q")) {
+        e.preventDefault();
+        if (!state.openFiles || state.openFiles.length <= 1) return;
+        const currentIndex = state.openFiles.findIndex((f) => f.id === state.activeFileId);
+        if (currentIndex === -1) return;
+        const nextIndex = e.shiftKey
+          ? (currentIndex - 1 + state.openFiles.length) % state.openFiles.length
+          : (currentIndex + 1) % state.openFiles.length;
+        state.activeFileId = state.openFiles[nextIndex].id;
+        renderTabs();
+        renderActiveDocument();
+      }
+    });
 
-  initialize();
-})();
+    initialize();
+  })();

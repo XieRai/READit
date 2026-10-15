@@ -78,3 +78,167 @@ body {
     box-shadow: 0 0 0 1px rgba(147, 51, 234, 0.35);
     background-color: #262626;
 }
+
+/* Smooth Frosted Auth Modal Backdrop */
+#auth-modal {
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), backdrop-filter 0.35s ease;
+}
+
+/* Sliding Auth Cards (Sign In vs Sign Up) */
+.auth-card-slide {
+    will-change: transform, opacity;
+    transition: transform 0.52s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+}
+
+/* =====================================================================
+   SIDEBAR COLLAPSE / MINIMIZE SYSTEM
+   ===================================================================== */
+#hub-sidebar {
+    transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#hub-sidebar.sidebar-collapsed {
+    width: 68px !important;
+}
+
+#hub-sidebar.sidebar-collapsed .sidebar-label,
+#hub-sidebar.sidebar-collapsed #account-chevron-icon {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+#hub-sidebar.sidebar-collapsed .sidebar-header {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    justify-content: center !important;
+}
+
+#hub-sidebar.sidebar-collapsed #sidebar-toggle-btn {
+    position: absolute;
+    right: -13px;
+    top: 24px;
+    z-index: 30;
+    background: #282828;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+#hub-sidebar.sidebar-collapsed #sidebar-toggle-icon {
+    transform: rotate(180deg);
+}
+
+#hub-sidebar.sidebar-collapsed .sidebar-nav-container {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+
+#hub-sidebar.sidebar-collapsed .sidebar-nav-btn {
+    padding: 0.55rem !important;
+    justify-content: center !important;
+    border-radius: 12px !important;
+}
+
+#hub-sidebar.sidebar-collapsed .sidebar-footer {
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+    justify-content: center !important;
+}
+
+#hub-sidebar.sidebar-collapsed #hub-account-trigger {
+    justify-content: center !important;
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    opacity: 0.65 !important;
+}
+
+/* =====================================================================
+   MULTI-TAB SYSTEM STYLING & DRAG-AND-DROP REORDERING
+   ===================================================================== */
+.reader-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: grab;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.6);
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.15s ease, opacity 0.15s ease;
+    user-select: none;
+    max-width: 220px;
+    flex-shrink: 0;
+}
+
+.reader-tab:active {
+    cursor: grabbing;
+}
+
+.reader-tab:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.reader-tab.active-tab {
+    background-color: #242424;
+    border-color: rgba(118, 184, 67, 0.7);
+    color: #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    font-weight: 600;
+}
+
+.reader-tab.active-tab .reader-tab-indicator {
+    background-color: #76B843;
+}
+
+/* Visual cues for Drag-and-Drop Tab Reordering */
+.reader-tab.is-dragging {
+    opacity: 0.45;
+    transform: scale(0.96);
+    border-style: dashed !important;
+    border-color: #76B843 !important;
+    background-color: rgba(118, 184, 67, 0.1) !important;
+}
+
+.reader-tab.drag-over-left {
+    border-left: 2px solid #76B843 !important;
+    transform: translateX(2px);
+}
+
+.reader-tab.drag-over-right {
+    border-right: 2px solid #76B843 !important;
+    transform: translateX(-2px);
+}
+
+.reader-tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    opacity: 0.5;
+    transition: all 0.15s ease;
+}
+
+.reader-tab-close:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+/* =====================================================================
+   GLOBAL FULL-SCREEN DRAG & DROP OVERLAY (UNDER 20MB)
+   ===================================================================== */
+#global-drag-overlay {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+

@@ -9,7 +9,7 @@ import asyncio
 import logging
 from typing import Any
 
-from app.config import GEMINI_API_KEY
+from app.config import GEMINI_API_KEY, get_gemini_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,10 @@ def _get_genai_client():
     """Return a configured google.genai client, or None on failure."""
     try:
         from google import genai
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        api_key = get_gemini_api_key()
+        if not api_key or api_key == "your_gemini_api_key_here":
+            return None
+        client = genai.Client(api_key=api_key)
         return client
     except Exception:
         logger.warning("Could not initialise Gemini client – falling back to mocks.")
@@ -156,10 +159,10 @@ def _get_genai_client():
 class LLMService:
     """Facade that resolves lens explanations via Gemini or deterministic mocks."""
 
-    def __init__(self) -> None:
-        self._api_key_present: bool = bool(
-            GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here"
-        )
+    @property
+    def api_key_present(self) -> bool:
+        key = get_gemini_api_key()
+        return bool(key and key != "your_gemini_api_key_here")
 
     # ----- public API -------------------------------------------------------
 
@@ -178,7 +181,7 @@ class LLMService:
                 "explanation": f"Unknown lens type '{lens_type}'.  Choose from: intuition, eli5, math.",
             }
 
-        if not self._api_key_present:
+        if not self.api_key_present:
             return self._mock_lens(text, lens_type)
 
         return await self._live_lens(text, lens_type, context)
@@ -188,7 +191,7 @@ class LLMService:
         paper_content: str,
     ) -> dict[str, Any]:
         """Generate a pre-baked symbol table and anchor dictionary."""
-        if not self._api_key_present:
+        if not self.api_key_present:
             return {"success": True, **MOCK_PREBAKE}
 
         return await self._live_prebake(paper_content)
