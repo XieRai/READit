@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>READit — Overcome Lexical Complexity</title>
+
+    <!-- Anti-FOUC Theme Initialization (Defaults to Dark Theme) -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('readit_theme');
+                if (savedTheme === 'light') {
+                    document.documentElement.classList.remove('dark');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    if (!savedTheme) {
+                        localStorage.setItem('readit_theme', 'dark');
+                    }
+                }
+            } catch (e) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Cinzel+Decorative:wght@700&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Separated Tailwind Custom Configuration -->
+    <script src="/static/js/tailwind-config.js"></script>
+
+    <!-- Separated Custom Stylesheet -->
+    <link rel="stylesheet" href="/static/css/landing.css">
+</head>
+<body class="bg-[#F8FAF9] dark:bg-[#070A09] text-neutral-900 dark:text-[#F8FAFC] relative selection:bg-emeraldGlow selection:text-obsidian">
+
+    <!-- Background Grid & Seamless Parallax Backlights -->
+    <div class="fixed inset-0 bg-tech-grid pointer-events-none z-0"></div>
+    <div id="parallax-glow-1" class="fixed top-[15%] right-[10%] w-[550px] h-[550px] rounded-full parallax-emerald-glow blur-3xl pointer-events-none z-0"></div>
+    <div id="parallax-glow-2" class="fixed top-[110%] left-[8%] w-[500px] h-[500px] rounded-full parallax-emerald-glow blur-3xl pointer-events-none z-0 opacity-70"></div>
+    <div id="parallax-glow-3" class="fixed top-[210%] right-[12%] w-[480px] h-[480px] rounded-full parallax-emerald-glow blur-3xl pointer-events-none z-0 opacity-60"></div>
+    <div id="parallax-glow-4" class="fixed top-[310%] left-[15%] w-[600px] h-[600px] rounded-full parallax-emerald-glow blur-3xl pointer-events-none z-0 opacity-80"></div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 0: HERO VIEWPORT (100VH INCLUDING HEADER, PADDING & TRUST BAR)    -->
+    <!-- ========================================================================= -->
+    <!-- Top Navigation Bar (Fixed + Smart Hide on Scroll Down / Reveal on Scroll Up) -->
+    <header id="site-header" class="site-header fixed top-0 left-0 right-0 z-50 w-full bg-[#F8FAF9]/90 dark:bg-[#070A09]/90 backdrop-blur-md border-b border-neutral-200/80 dark:border-white/[0.08]">
+        <div class="max-w-[1360px] mx-auto px-4 sm:px-8 lg:px-12 py-3.5 sm:py-4 flex items-center justify-between relative">
+            
+            <!-- Mobile Left Spacer for mathematical centering of logo on mobile -->
+            <div class="w-9 h-9 md:hidden shrink-0"></div>
+
+            <!-- Brand Logo (Centered on mobile, left-aligned on md+) -->
+            <a href="/" class="md:static absolute left-1/2 -translate-x-1/2 md:translate-x-0 group flex items-center select-none focus:outline-none z-10" aria-label="READit Home">
+                <img src="/assets/image/readit_logo.png" alt="READit" class="h-8 sm:h-9 w-auto object-contain hover:opacity-90 transition-opacity">
+            </a>
+
+            <!-- Right Navigation & CTA (Desktop) -->
+            <nav class="hidden md:flex items-center gap-5 lg:gap-7">
+                <a href="#features-showcase" class="text-sm sm:text-[15px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">
+                    Features
+                </a>
+                <a href="#dataset-section" class="text-sm sm:text-[15px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">
+                    12+ Languages
+                </a>
+                <a href="#audience-section" class="hidden lg:inline-block text-sm sm:text-[15px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">
+                    Who It's For
+                </a>
+                <a href="/hub" class="text-sm sm:text-[15px] font-medium text-emerald-600 dark:text-emeraldGlow hover:text-emerald-500 dark:hover:text-white transition-colors">
+                    Document Hub
+                </a>
+
+                <!-- Theme Toggle Button (Desktop) -->
+                <button id="theme-toggle-btn" onclick="toggleTheme()" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-neutral-300 dark:border-white/10 bg-black/[0.04] dark:bg-white/5 hover:bg-black/[0.08] dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 transition-all text-xs font-medium focus:outline-none" aria-label="Switch Theme" title="Switch Theme">
+                    <svg class="w-3.5 h-3.5 hidden dark:block text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="w-3.5 h-3.5 block dark:hidden text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <span id="theme-toggle-label" class="tracking-wide text-[11px] font-monoFeature">Dark</span>
+                </button>
+
+                <button onclick="triggerChromeInstall()" class="btn-emerald-glow text-obsidian font-semibold text-sm sm:text-[15px] px-5 py-2.5 rounded-full">
+                    Add to Chrome
+                </button>
+            </nav>
+
+            <!-- Mobile Burger Toggle Button -->
+            <button id="mobile-menu-btn" onclick="toggleMobileMenu()" type="button" class="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 focus:outline-none transition-colors z-20" aria-label="Toggle navigation menu" aria-expanded="false">
+                <svg id="burger-icon-open" class="w-6 h-6 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+                <svg id="burger-icon-close" class="hidden w-6 h-6 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Mobile Navigation Drawer (Wraps all buttons and links in the burger) -->
+        <div id="mobile-menu" class="hidden md:hidden bg-[#F8FAF9]/95 dark:bg-[#0A0E0C]/95 backdrop-blur-xl border-b border-neutral-200 dark:border-white/15 px-6 py-5 shadow-2xl transition-all duration-300">
+            <nav class="flex flex-col space-y-3.5">
+                <a href="#features-showcase" onclick="closeMobileMenu()" class="text-base font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors py-2 border-b border-neutral-200/70 dark:border-white/[0.06]">
+                    Features
+                </a>
+                <a href="#dataset-section" onclick="closeMobileMenu()" class="text-base font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors py-2 border-b border-neutral-200/70 dark:border-white/[0.06]">
+                    12+ Languages
+                </a>
+                <a href="#audience-section" onclick="closeMobileMenu()" class="text-base font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors py-2 border-b border-neutral-200/70 dark:border-white/[0.06]">
+                    Who It's For
+                </a>
+                <a href="/hub" class="text-base font-medium text-emerald-600 dark:text-emeraldGlow hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors py-2 border-b border-neutral-200/70 dark:border-white/[0.06] flex items-center justify-between">
+                    <span>Document Hub</span>
+                    <span class="text-xs px-2.5 py-0.5 rounded-full bg-emeraldGlow/15 text-emerald-700 dark:text-emeraldGlow font-monoFeature">Live →</span>
+                </a>
+
+                <!-- Mobile Theme Toggle Option -->
+                <div class="py-2 border-b border-neutral-200/70 dark:border-white/[0.06] flex items-center justify-between">
+                    <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Theme</span>
+                    <button onclick="toggleTheme()" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-neutral-300 dark:border-white/10 bg-black/[0.04] dark:bg-white/5 text-neutral-700 dark:text-neutral-300 text-xs font-medium">
+                        <svg class="w-3.5 h-3.5 hidden dark:block text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="w-3.5 h-3.5 block dark:hidden text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                        <span id="mobile-theme-toggle-label" class="tracking-wide text-[11px] font-monoFeature">Dark</span>
+                    </button>
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="triggerChromeInstall(); closeMobileMenu();" class="btn-emerald-glow text-obsidian font-semibold text-base w-full py-3 rounded-full flex items-center justify-center gap-2">
+                        <span>Add to Chrome</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="relative z-10 min-h-screen lg:h-screen w-full flex flex-col justify-between box-border overflow-hidden pt-16 sm:pt-20">
+
+        <!-- Main Hero Content -->
+        <main class="relative z-10 w-full max-w-[1360px] mx-auto px-6 sm:px-12 my-auto py-4 flex-1 flex items-center">
+            <div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-12 items-center">
+                
+                <!-- Left Column: High-Impact Minimalist Value Proposition -->
+                <div class="lg:col-span-6 space-y-6 text-left max-w-xl">
+                    <h1 class="font-display font-bold text-5xl sm:text-6xl lg:text-[64px] text-neutral-950 dark:text-white tracking-[-0.03em] leading-[1.07]">
+                        Overcome lexical<br />complexity.
+                    </h1>
+                    
+                    <p class="text-xl sm:text-2xl lg:text-[26px] text-neutral-600 dark:text-[#8A9994] font-normal leading-[1.42] tracking-[-0.01em] max-w-lg">
+                        Read dense academic text<br class="hidden sm:inline" /> with complete clarity.
+                    </p>
+
+                    <!-- Action Button Group -->
+                    <div class="pt-2 flex flex-wrap items-center gap-4">
+                        <a href="/hub" class="btn-emerald-glow text-obsidian font-semibold text-base px-6 py-3.5 rounded-full inline-flex items-center gap-2.5">
+                            <svg class="w-4 h-4 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline stroke-linecap="round" stroke-linejoin="round" points="15 3 21 3 21 9" />
+                                <line stroke-linecap="round" stroke-linejoin="round" x1="10" y1="14" x2="21" y2="3" />
+                            </svg>
+                            <span>Get started — It's free</span>
+                        </a>
+
+                        <a href="#features-showcase" class="px-6 py-3.5 rounded-full bg-black/[0.04] dark:bg-white/[0.02] hover:bg-black/[0.08] dark:hover:bg-white/[0.07] text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white border border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 transition-all text-base font-medium inline-flex items-center gap-2.5">
+                            <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <circle cx="12" cy="12" r="10" />
+                                <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
+                            </svg>
+                            <span>Watch demo</span>
+                        </a>
+                    </div>
+
+                    <!-- Subtle Interactive Preset Switcher -->
+                    <div class="pt-4 flex items-center gap-3 text-xs text-neutral-500">
+                        <span class="uppercase tracking-wider font-medium text-neutral-500">Live card preview:</span>
+                        <button onclick="selectPreset(0)" id="preset-btn-0" class="px-2.5 py-1 rounded-md bg-neutral-900 text-white dark:bg-white/10 dark:text-neutral-200 hover:opacity-90 transition font-medium text-xs shadow-sm">lexical</button>
+                        <button onclick="selectPreset(1)" id="preset-btn-1" class="px-2.5 py-1 rounded-md bg-black/[0.04] text-neutral-600 dark:bg-white/[0.03] dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition text-xs">epistemological</button>
+                        <button onclick="selectPreset(2)" id="preset-btn-2" class="px-2.5 py-1 rounded-md bg-black/[0.04] text-neutral-600 dark:bg-white/[0.03] dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition text-xs">ontogenetic</button>
+                    </div>
+                </div>
+
+                <!-- Right Column: 3D Tilted Glassmorphic Document Showcase -->
+                <div class="lg:col-span-6 flex justify-center lg:justify-end relative">
+                    <div class="relative w-full max-w-[420px] sm:max-w-[450px] h-[440px] sm:h-[470px] flex items-center justify-center">
+                        
+                        <!-- Tilted Frosted Glass Document Card -->
+                        <div id="glass-doc" class="document-glass-card w-[345px] sm:w-[380px] h-[420px] sm:h-[445px] rounded-[24px] p-7 sm:p-8 flex flex-col justify-between relative select-none">
+                            <div class="absolute inset-x-6 top-0 h-[1px] bg-gradient-to-r from-transparent via-neutral-300 dark:via-white/30 to-transparent"></div>
+
+                            <!-- Top Paragraph Skeleton Bars -->
+                            <div onclick="selectPreset(1)" class="doc-line-group space-y-3" title="Click to inspect paragraph">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[28%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[58%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[44%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[35%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[15%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[74%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[12%] rounded-full"></div>
+                                </div>
+                            </div>
+
+                            <!-- Highlighted Amber/Emerald Selection Box -->
+                            <div id="highlight-box" onclick="toggleRealTextMode()" class="amber-highlight-box rounded-xl p-4 my-1 cursor-pointer group relative" title="Click to toggle skeleton / readable text">
+                                <div id="highlight-skeleton" class="space-y-3">
+                                    <div class="flex items-center gap-3">
+                                        <div id="bar-1" class="h-2.5 w-[54%] rounded-full bg-[#E5B842] transition-all duration-500"></div>
+                                        <div id="bar-2" class="h-2.5 w-[38%] rounded-full bg-[#E5B842] transition-all duration-500"></div>
+                                    </div>
+                                    <div class="flex items-center gap-2.5">
+                                        <div id="bar-3" class="h-2 rounded-full w-[78%] bg-[#E5B842]/50 transition-all duration-500"></div>
+                                    </div>
+                                </div>
+
+                                <div id="highlight-text-content" class="hidden text-xs sm:text-[13px] leading-relaxed font-medium text-amber-900 dark:text-amber-100">
+                                    <span id="live-sentence-text">"High <span class="text-amber-600 dark:text-amber-300 font-semibold underline">lexical</span> density impedes rapid reading comprehension."</span>
+                                </div>
+                            </div>
+
+                            <!-- Middle Paragraph Skeleton Bars -->
+                            <div onclick="selectPreset(2)" class="doc-line-group space-y-3" title="Click to inspect paragraph">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[64%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[70%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[42%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[32%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[22%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[48%] rounded-full"></div>
+                                </div>
+                            </div>
+
+                            <!-- Bottom Paragraph Skeleton Bars -->
+                            <div onclick="selectPreset(0)" class="doc-line-group space-y-3 opacity-60" title="Click to inspect paragraph">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[68%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[34%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[28%] rounded-full"></div>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <div class="skeleton-bar h-2.5 w-[40%] rounded-full"></div>
+                                    <div class="skeleton-bar h-2.5 w-[18%] rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Floating Glass Translation Popover Card -->
+                        <div id="translation-popover" class="popover-glass-card absolute -bottom-2 right-0 sm:-right-4 w-[215px] sm:w-[235px] rounded-2xl p-4 sm:p-5 z-20">
+                            <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-neutral-200 dark:border-white/10">
+                                <span id="popover-badge" class="text-xs font-normal text-neutral-500 dark:text-neutral-300 tracking-wide">translation</span>
+                                <button onclick="cycleNextPreset()" class="text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition text-sm leading-none p-0.5" title="Next sample term">
+                                    &#10005;
+                                </button>
+                            </div>
+
+                            <div class="space-y-1 mb-4">
+                                <h3 id="popover-term" class="font-display font-bold text-lg sm:text-[19px] text-neutral-900 dark:text-white tracking-tight">
+                                    lexical (adj.)
+                                </h3>
+                                <p id="popover-def" class="text-xs sm:text-[13px] text-neutral-600 dark:text-neutral-300/90 leading-snug">
+                                    relating to words
+                                </p>
+                            </div>
+
+                            <button id="simplify-btn" onclick="triggerSimplifyAnimation()" class="w-full py-2 px-4 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/[0.1] dark:hover:bg-white/[0.15] active:scale-[0.98] border border-neutral-200 dark:border-white/15 text-xs sm:text-[13px] font-medium text-neutral-800 dark:text-white transition-all flex items-center justify-center gap-1.5">
+                                <span id="simplify-btn-text">Simplify</span>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Bottom Multilingual & Dataset Trust Bar inside 100vh Hero -->
+        <div class="relative z-10 w-full border-y border-neutral-200 dark:border-white/[0.06] bg-black/[0.015] dark:bg-white/[0.01] backdrop-blur-sm shrink-0">
+            <div class="max-w-[1360px] mx-auto px-6 sm:px-12 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
+                <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-8 gap-y-2">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2 h-2 rounded-full bg-emeraldGlow"></span>
+                        <span class="font-semibold text-neutral-900 dark:text-white">25,000+</span> Classified Academic Terms
+                    </div>
+                    <span class="hidden sm:inline text-neutral-300 dark:text-white/15">•</span>
+                    <div class="flex items-center gap-2.5">
+                        <span class="font-semibold text-neutral-900 dark:text-white">12+ Languages</span> Native & Simple Breakdowns
+                    </div>
+                    <span class="hidden sm:inline text-neutral-300 dark:text-white/15">•</span>
+                    <div class="flex items-center gap-2.5">
+                        <span class="font-semibold text-neutral-900 dark:text-white">Zero-Latency</span> Hybrid AWL + Context Engine
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 text-[11px] font-monoFeature">
+                    <span class="text-neutral-500 mr-1.5">SUPPORTED:</span>
+                    <span class="px-2.5 py-1 rounded-md bg-emeraldGlow/15 text-emerald-700 dark:text-emeraldGlow border border-emerald-500/30 dark:border-emeraldGlow/30">EN</span>
+                    <span class="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10">ID</span>
+                    <span class="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10">ZH</span>
+                    <span class="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10">ES</span>
+                    <span class="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10">JA</span>
+                    <span class="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10">DE</span>
+                    <span class="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10">+6</span>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 1: INTERACTIVE ACADEMIC PDF FEATURE SHOWCASE (100VH FULL SCREEN)  -->
+    <!-- ========================================================================= -->
+    <section id="features-showcase" class="relative z-10 w-full min-h-0 h-auto lg:h-screen box-border flex flex-col justify-center max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 py-14 sm:py-16 lg:py-10 overflow-visible lg:overflow-hidden">
+        
+        <!-- Compact Section Header -->
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between mb-6 sm:mb-8 shrink-0 gap-4">
+            <div class="space-y-2 max-w-2xl">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emeraldGlow/10 border border-emeraldGlow/25 text-emerald-700 dark:text-emeraldGlow text-[11px] font-monoFeature tracking-wider uppercase">
+                    <span>Interactive Paper Engine</span>
+                </div>
+                <h2 class="font-display font-bold text-2xl sm:text-4xl lg:text-[42px] text-neutral-950 dark:text-white tracking-[-0.025em] leading-[1.15]">
+                    See how READit transforms real peer-reviewed papers.
+                </h2>
+            </div>
+        </div>
+
+        <!-- Two-Column Asymmetric Showcase -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-16 items-center flex-1 min-h-0">
+            
+            <!-- LEFT COLUMN: Complete Academic PDF Reader -->
+            <div class="lg:col-span-7 flex flex-col h-[500px] sm:h-[580px] lg:h-full lg:max-h-[72vh] rounded-[20px] sm:rounded-[28px] bg-neutral-100 dark:bg-[#111614] border border-neutral-300/80 dark:border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:shadow-[0_32px_80px_rgba(0,0,0,0.8)] overflow-hidden">
+                
+                <!-- Top Two-Tier PDF Reader Header Bar -->
+                <div class="shrink-0 bg-neutral-200/90 dark:bg-[#0B0F0E] border-b border-neutral-300/80 dark:border-white/10 px-4 sm:px-8 py-3 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3.5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-rose-500/70"></span>
+                            <span class="w-3 h-3 rounded-full bg-amber-400/70"></span>
+                            <span class="w-3 h-3 rounded-full bg-emeraldGlow/80"></span>
+                        </div>
+                        <span class="h-4 w-[1px] bg-neutral-400/40 dark:bg-white/10"></span>
+                        <span class="text-xs font-monoFeature text-neutral-700 dark:text-neutral-300 truncate max-w-[170px] sm:max-w-none">
+                            Tian_et_al_2023_Arc_Fault_AI_Review.pdf
+                        </span>
+                    </div>
+
+                    <!-- Right Controls: Language Pill + Before/After Switch -->
+                    <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                        <div class="flex items-center bg-neutral-300/60 dark:bg-white/[0.04] border border-neutral-300 dark:border-white/10 rounded-full p-0.5 text-xs font-medium">
+                            <button onclick="setPdfLanguage('en')" id="lang-btn-en" class="px-2.5 sm:px-3 py-1 rounded-full bg-emeraldGlow text-obsidian font-semibold transition text-[11px] sm:text-xs">Simple EN</button>
+                            <button onclick="setPdfLanguage('id')" id="lang-btn-id" class="px-2.5 sm:px-3 py-1 rounded-full text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition text-[11px] sm:text-xs">Bahasa ID</button>
+                        </div>
+
+                        <div class="flex items-center bg-neutral-300/60 dark:bg-black/50 border border-neutral-300 dark:border-white/10 rounded-full p-0.5 text-xs">
+                            <button onclick="setPaperMode('before')" id="mode-btn-before" class="px-3 sm:px-3.5 py-1 rounded-full text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition font-medium text-[11px] sm:text-xs">
+                                Before (Original)
+                            </button>
+                            <button onclick="setPaperMode('after')" id="mode-btn-after" class="px-3.5 sm:px-4 py-1 rounded-full bg-emeraldGlow text-obsidian font-semibold shadow-sm transition text-[11px] sm:text-xs">
+                                After (READit)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-Toolbar Live Status Strip -->
+                <div class="shrink-0 bg-neutral-200/50 dark:bg-[#141B18] border-b border-neutral-300/70 dark:border-white/[0.07] px-4 sm:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emeraldGlow animate-pulse"></span>
+                        <span id="pdf-active-status-label" class="font-monoFeature text-emerald-700 dark:text-emeraldGlow font-medium tracking-wide text-[11px] sm:text-xs">
+                            TRANSLATING IDEA • ACTIVE
+                        </span>
+                    </div>
+                    <span class="text-neutral-600 dark:text-neutral-400 text-[11px] hidden md:inline">
+                        Click any highlighted sentence in the paper or switch features on the right
+                    </span>
+                </div>
+
+                <!-- Spacious PDF Canvas Wrapper -->
+                <div id="pdf-scroll-container" class="pdf-scroll-viewport flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 lg:p-9 bg-neutral-200 dark:bg-[#1A201E] scroll-smooth">
+                    <!-- Complete Unabridged Mathematical Biosciences and Engineering Paper -->
+                    <div class="academic-paper-sheet rounded-xl p-4 sm:p-8 lg:p-10 font-serifPaper text-[#111827] leading-[1.7] select-text">
+                        
+                        <!-- Journal Top Header -->
+                        <div class="flex flex-col sm:flex-row sm:items-start justify-between pb-4 mb-5 border-b-2 border-neutral-800 gap-4">
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-full border border-[#0284C7] flex items-center justify-center relative overflow-hidden shrink-0 text-[#0284C7]">
+                                        <svg class="w-11 h-11 opacity-85" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.1">
+                                            <circle cx="20" cy="20" r="16"/>
+                                            <ellipse cx="20" cy="20" rx="8" ry="16"/>
+                                            <line x1="4" y1="14" x2="36" y2="14"/>
+                                            <line x1="4" y1="20" x2="36" y2="20"/>
+                                            <line x1="4" y1="26" x2="36" y2="26"/>
+                                        </svg>
+                                        <span class="absolute bg-white px-1 font-sans font-black text-[9.5px] tracking-tighter text-[#0369A1]">AIMS</span>
+                                    </div>
+                                    <div class="text-[#0284C7] italic text-[15px] leading-snug font-serifPaper">
+                                        <div>Mathematical Biosciences</div>
+                                        <div>and Engineering</div>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-neutral-700 font-serifPaper">
+                                    http://www.aimspress.com/journal/mbe
+                                </div>
+                            </div>
+
+                            <div class="text-[11px] text-neutral-800 font-serifPaper leading-[1.45] sm:text-left hidden sm:block">
+                                <div>MBE, 20(7): 12404–12432.</div>
+                                <div>DOI: 10.3934/mbe.2023552</div>
+                                <div>Received: 10 February 2023</div>
+                                <div>Revised: 12 April 2023</div>
+                                <div>Accepted: 15 May 2023</div>
+                                <div>Published: 23 May 2023</div>
+                            </div>
+                        </div>
+
+                        <!-- Review Label, Title, Authors, Full Affiliations & Correspondence -->
+                        <div class="mb-4 sm:mb-5 space-y-2">
+                            <div class="italic text-xs text-neutral-800">Review</div>
+                            <h3 class="font-bold text-base sm:text-lg lg:text-[20px] text-black leading-[1.3]">
+                                Arc fault detection using artificial intelligence: Challenges and benefits
+                            </h3>
+                            <div class="font-bold text-[12px] sm:text-[13px] text-black pt-0.5">
+                                Chunpeng Tian<sup>1</sup>, Zhaoyang Xu<sup>2</sup>, Lukun Wang<sup>1</sup> and Yunjie Liu<sup>3,</sup>*
+                            </div>
+                            <div class="text-[11px] sm:text-[11.5px] text-neutral-700 leading-[1.45] space-y-1 pt-1 hidden sm:block">
+                                <div><sup>1</sup> College of Intelligent Equipment, Shandong University of Science and Technology, Taian 271019, China</div>
+                                <div><sup>2</sup> University of Cambridge, Wellcome-MRC Cambridge Stem Cell Institute, Cambridge, England</div>
+                                <div><sup>3</sup> School of Communication Engineering, Taishan College of Science and Technology, Taian 271038, China</div>
+                            </div>
+                            <div class="text-[11px] sm:text-[11.5px] text-neutral-800 pt-1 hidden sm:block">
+                                <span class="font-bold">* Correspondence:</span> Email: China.alsiaHappyduobi@gmail.com.
+                            </div>
+                        </div>
+
+                        <!-- Complete Abstract Section -->
+                        <div class="text-[13.5px] sm:text-[14.5px] text-neutral-900 leading-[1.72] text-justify space-y-3">
+                            <div>
+                                <span class="font-bold text-black">Abstract:</span>
+                                <span id="abstract-antecedent-1" class="pdf-highlight-span">This systematic review aims to investigate recent developments in the area of arc fault detection.</span>
+                                
+                                <!-- FEATURE 1 TARGET: Translating Idea -->
+                                <span id="target-feature-0" onclick="handlePaperSpanClick(0)" class="pdf-highlight-span pdf-highlight-active-translate" title="Click to toggle READit Idea Translation">
+                                    The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults and the likelihood of related fires, presenting a matter of considerable concern.
+                                </span>
+
+                                <!-- INLINE BEFORE / AFTER PDF ACCORDION FOR FEATURE 0 -->
+                                <div id="accordion-feature-0" class="pdf-accordion-wrapper open font-sans text-left">
+                                    <div class="pdf-accordion-inner">
+                                        <div class="rounded-xl sm:rounded-2xl bg-[#0D1512] text-white p-3.5 sm:p-6 border border-emeraldGlow/40 shadow-xl my-3 space-y-3 sm:space-y-4">
+                                            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="px-2.5 py-0.5 rounded-full bg-emeraldGlow/20 text-emeraldGlow font-monoFeature text-[11px] font-semibold uppercase tracking-wider">
+                                                        Translating Idea
+                                                    </span>
+                                                    <span class="text-xs text-neutral-400">Before vs. After Accordion</span>
+                                                </div>
+                                                <button onclick="toggleCurrentAccordion()" class="text-neutral-400 hover:text-white text-xs font-medium transition">
+                                                    Collapse ▲
+                                                </button>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature uppercase tracking-wider text-amber-300 font-semibold">
+                                                        Before (Dense Academic Original)
+                                                    </div>
+                                                    <p class="text-xs text-neutral-300 leading-relaxed italic">
+                                                        "The rising demand for electricity and <u>concomitant</u> expansion of energy systems has resulted in a <u>heightened</u> risk of arc faults..."
+                                                    </p>
+                                                </div>
+                                                <div class="p-3.5 rounded-xl bg-emerald-950/35 border border-emeraldGlow/35 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature uppercase tracking-wider text-emeraldGlow font-semibold" id="acc-0-after-label">
+                                                        After (READit Plain Meaning)
+                                                    </div>
+                                                    <p class="text-xs sm:text-[13px] text-white font-medium leading-relaxed" id="acc-0-after-text">
+                                                        "As electricity use grows and power grids expand alongside it, dangerous electrical sparks (arc faults) and fires are much more likely to happen."
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-[11px]">
+                                                <span class="text-neutral-400">Classified Dataset Hits:</span>
+                                                <span class="px-2 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30">
+                                                    <strong>concomitant</strong> (C2) → happening at the same time
+                                                </span>
+                                                <span class="px-2 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30">
+                                                    <strong>heightened</strong> (C1) → increased
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                To address this challenge, this review focuses on the role of artificial intelligence (AI) in arc fault detection, with the objective of illuminating its advantages and identifying current limitations. Through a meticulous literature selection process, <span id="abstract-antecedent-2" class="pdf-highlight-span">a total of 63 articles were included in the final analysis</span>. The findings of this review suggest that AI plays a significant role in enhancing the accuracy and speed of detection and allowing for customization to specific types of faults in arc fault detection.
+
+                                <!-- FEATURE 2 TARGET: Quick Reference -->
+                                <span id="target-feature-1" onclick="handlePaperSpanClick(1)" class="pdf-highlight-span" title="Click to inspect Passive Voice & Reference">
+                                    Simultaneously, three major challenges were also identified, including missed and false detections, the restricted application of neural networks and the paucity of relevant data.
+                                </span>
+
+                                <!-- INLINE BEFORE / AFTER PDF ACCORDION FOR FEATURE 1 -->
+                                <div id="accordion-feature-1" class="pdf-accordion-wrapper font-sans text-left">
+                                    <div class="pdf-accordion-inner">
+                                        <div class="rounded-xl sm:rounded-2xl bg-[#0D1512] text-white p-3.5 sm:p-6 border border-emeraldGlow/40 shadow-xl my-3 space-y-3 sm:space-y-4">
+                                            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+                                                <div class="flex items-center gap-2">
+                                                     <span class="px-2.5 py-0.5 rounded-full bg-emeraldGlow/20 text-emeraldGlow font-monoFeature text-[11px] font-semibold uppercase tracking-wider">
+                                                         Quick Reference • Passive Voice Resolver
+                                                     </span>
+                                                 </div>
+                                                 <button onclick="toggleCurrentAccordion()" class="text-neutral-400 hover:text-white text-xs font-medium transition">
+                                                     Collapse ▲
+                                                 </button>
+                                             </div>
+
+                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                 <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                                                     <div class="text-[10px] font-monoFeature uppercase tracking-wider text-amber-300 font-semibold">
+                                                         Before (Ambiguous Passive Voice)
+                                                     </div>
+                                                     <p class="text-xs text-neutral-300 leading-relaxed italic">
+                                                         "...three major challenges <u>were also identified</u>, including missed and false detections... and the <u>paucity</u> of relevant data."
+                                                     </p>
+                                                 </div>
+                                                 <div class="p-3.5 rounded-xl bg-emerald-950/35 border border-emeraldGlow/35 space-y-1">
+                                                     <div class="text-[10px] font-monoFeature uppercase tracking-wider text-emeraldGlow font-semibold" id="acc-1-after-label">
+                                                         After (Active Subject & Antecedent Linked)
+                                                     </div>
+                                                     <p class="text-xs sm:text-[13px] text-white leading-relaxed" id="acc-1-after-text">
+                                                         <strong>Who identified them?</strong> → The authors (<span class="underline decoration-indigo-400">Tian et al., 2023</span>) across the <span class="underline decoration-indigo-400">63 analyzed articles</span>.<br/>
+                                                         <strong>Active Rewrite:</strong> "By analyzing those 63 papers, the authors identified three major AI challenges: missed/false alarms, limited neural network flexibility, and a <strong>shortage (paucity)</strong> of training data."
+                                                     </p>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+
+                                 In conclusion, AI has exhibited tremendous potential for transforming the field of arc fault detection and holds substantial promise for enhancing electrical safety.
+                             </div>
+
+                             <!-- Keywords Line -->
+                             <div class="pt-1 pb-3 border-b-2 border-neutral-800 text-[12.5px] text-neutral-900">
+                                 <span class="font-bold">Keywords:</span> arc fault detection; artificial intelligence; detection methods; arc fault location; electric fire
+                             </div>
+                         </div>
+
+                         <!-- Section 1: Introduction -->
+                         <div class="mt-4 text-[13.5px] sm:text-[14.5px] text-neutral-900 leading-[1.72] text-justify">
+                             <div class="font-bold text-black text-[13.5px] mb-2">1. Introduction</div>
+                             <p class="indent-6">
+                                 The proliferation of urbanization and industrialization has resulted in a surging demand for energy, necessitating the development of new and efficient energy systems. Nonetheless, the outdated nature of current photovoltaic and energy storage systems has given rise to 
+                                 
+                                 <!-- FEATURE 3 TARGET: Easy Citation -->
+                                 <span id="target-feature-2" onclick="handlePaperSpanClick(2)" class="pdf-highlight-span" title="Click to bring citation [1] inline">
+                                     numerous incidents of arc faults [1].
+                                 </span>
+
+                                 It has been well established that arc faults can have hazardous and disruptive consequences, a number of which are depicted in Figure 1. Perhaps the most critical of these dangers is the risk of fire, as
+                             </p>
+
+                             <!-- INLINE BEFORE / AFTER PDF ACCORDION FOR FEATURE 2 -->
+                             <div id="accordion-feature-2" class="pdf-accordion-wrapper font-sans text-left">
+                                 <div class="pdf-accordion-inner">
+                                     <div class="rounded-xl sm:rounded-2xl bg-[#0D1512] text-white p-3.5 sm:p-6 border border-blue-400/40 shadow-xl my-3 space-y-3 sm:space-y-4">
+                                        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+                                            <div class="flex items-center gap-2">
+                                                <span class="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-monoFeature text-[11px] font-semibold uppercase tracking-wider">
+                                                    Easy Citation [1] • Brought to Your Text
+                                                </span>
+                                            </div>
+                                            <button onclick="toggleCurrentAccordion()" class="text-neutral-400 hover:text-white text-xs font-medium transition">
+                                                Collapse ▲
+                                            </button>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                                                <div class="text-[10px] font-monoFeature uppercase tracking-wider text-neutral-400 font-semibold">
+                                                    Before (Scroll 18 Pages to Bibliography)
+                                                </div>
+                                                <p class="text-xs text-neutral-300 leading-relaxed">
+                                                    Reader only sees <span class="px-1.5 py-0.5 rounded bg-white/10 font-monoFeature">[1]</span> and loses reading flow scrolling to the end of the PDF to check what study backs this claim.
+                                                </p>
+                                            </div>
+                                            <div class="p-3.5 rounded-xl bg-blue-950/35 border border-blue-400/30 space-y-1.5">
+                                                <div class="text-[10px] font-monoFeature uppercase tracking-wider text-blue-300 font-semibold">
+                                                    After (Instant Inline Reference Card)
+                                                </div>
+                                                <div class="text-xs font-semibold text-white leading-snug">
+                                                    [1] Lu, S., Phung, B. T., & Zhang, D. (2018). "A comprehensive review on DC arc fault detection in photovoltaic systems." <em>IEEE Trans. Power Delivery</em>.
+                                                </div>
+                                                <div class="text-[11.5px] text-neutral-200 leading-relaxed" id="acc-2-after-text">
+                                                    <strong class="text-blue-300">Why it's cited here:</strong> Confirms that aging solar (photovoltaic) inverters and degraded cable insulation are the primary triggers for DC series arc faults in modern grids.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Bottom Helper Bar on PDF Reader -->
+                <div class="shrink-0 bg-neutral-200/90 dark:bg-[#0B0F0E] border-t border-neutral-300/80 dark:border-white/10 px-6 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-600 dark:text-neutral-400">
+                    <div class="flex items-center gap-2">
+                        <span class="text-neutral-500">Page 1 of 29</span>
+                        <span>•</span>
+                        <span>3 Interactive Feature Targets Ready</span>
+                    </div>
+                    <button onclick="setPaperMode(currentPaperMode === 'after' ? 'before' : 'after')" class="inline-flex items-center gap-2 text-emerald-600 dark:text-emeraldGlow hover:underline font-medium">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emeraldGlow"></span>
+                        <span>• Toggle Before / After</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Spacious Feature Stack with Gliding Green Block -->
+            <div class="lg:col-span-5 flex flex-col justify-center relative">
+                
+                <!-- Minimalist Step Header -->
+                <div class="mb-3 sm:mb-4 flex items-center justify-between text-xs font-monoFeature uppercase tracking-widest text-neutral-500 px-1 sm:px-2">
+                    <span>Interactive Capabilities</span>
+                    <span id="active-feature-step" class="text-emerald-600 dark:text-emeraldGlow font-semibold">01 / 03</span>
+                </div>
+
+                <!-- Relative Container for Feature Cards + Sliding Green Block -->
+                <div id="feature-cards-container" class="relative flex flex-col space-y-3 sm:space-y-5">
+                    
+                    <!-- THE SLIDING GREEN BLOCK -->
+                    <div id="sliding-green-block" class="feature-green-slider absolute left-0 right-0 top-0 rounded-[18px] sm:rounded-[24px] pointer-events-none z-0" style="height: 60px; transform: translateY(0px);"></div>
+
+                    <!-- FEATURE CARD 1: TRANSLATING IDEA -->
+                    <button onclick="selectFeature(0)" id="feature-card-0" class="relative z-10 w-full text-left p-4 sm:p-6 lg:p-7 rounded-[18px] sm:rounded-[24px] transition-all duration-300 focus:outline-none group border border-transparent">
+                        <div class="flex items-center justify-between mb-0 sm:mb-2.5">
+                            <h3 id="title-feat-0" class="font-monoFeature font-bold text-sm sm:text-lg lg:text-xl tracking-[0.06em] uppercase text-white transition-colors">
+                                TRANSLATING IDEA
+                            </h3>
+                            <span id="badge-feat-0" class="text-[10px] sm:text-[11px] font-monoFeature uppercase tracking-wider text-white/90">
+                                ● Active
+                            </span>
+                        </div>
+                        <p id="desc-feat-0" class="hidden sm:block font-sans text-sm sm:text-[15px] leading-relaxed text-white/90 mt-1 sm:mt-0">
+                            Convert complex academical language into an easier to understand language without changing the meaning!
+                        </p>
+                    </button>
+
+                    <!-- FEATURE CARD 2: QUICK REFERENCE -->
+                    <button onclick="selectFeature(1)" id="feature-card-1" class="relative z-10 w-full text-left p-4 sm:p-6 lg:p-7 rounded-[18px] sm:rounded-[24px] transition-all duration-300 focus:outline-none group border border-neutral-200 dark:border-white/[0.08] hover:border-neutral-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.015] shadow-sm dark:shadow-none">
+                        <div class="flex items-center justify-between mb-0 sm:mb-2.5">
+                            <h3 id="title-feat-1" class="font-monoFeature font-bold text-sm sm:text-lg lg:text-xl tracking-[0.06em] uppercase text-neutral-900 dark:text-neutral-200 group-hover:text-black dark:group-hover:text-white transition-colors">
+                                QUICK REFERENCE
+                            </h3>
+                            <span id="badge-feat-1" class="text-[10px] sm:text-[11px] font-monoFeature uppercase tracking-wider text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-200 transition">
+                                Select →
+                            </span>
+                        </div>
+                        <p id="desc-feat-1" class="hidden sm:block font-sans text-sm sm:text-[15px] leading-relaxed text-neutral-700 dark:text-[#8A9994] group-hover:text-neutral-950 dark:group-hover:text-neutral-200 transition-colors mt-1 sm:mt-0">
+                            Have short memory on remembering which passive voice refer to? Now it as simply as click a text!
+                        </p>
+                    </button>
+
+                    <!-- FEATURE CARD 3: EASY CITATION -->
+                    <button onclick="selectFeature(2)" id="feature-card-2" class="relative z-10 w-full text-left p-4 sm:p-6 lg:p-7 rounded-[18px] sm:rounded-[24px] transition-all duration-300 focus:outline-none group border border-neutral-200 dark:border-white/[0.08] hover:border-neutral-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.015] shadow-sm dark:shadow-none">
+                        <div class="flex items-center justify-between mb-0 sm:mb-2.5">
+                            <h3 id="title-feat-2" class="font-monoFeature font-bold text-sm sm:text-lg lg:text-xl tracking-[0.06em] uppercase text-neutral-900 dark:text-neutral-200 group-hover:text-black dark:group-hover:text-white transition-colors">
+                                EASY CITATION
+                            </h3>
+                            <span id="badge-feat-2" class="text-[10px] sm:text-[11px] font-monoFeature uppercase tracking-wider text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-200 transition">
+                                Select →
+                            </span>
+                        </div>
+                        <p id="desc-feat-2" class="hidden sm:block font-sans text-sm sm:text-[15px] leading-relaxed text-neutral-700 dark:text-[#8A9994] group-hover:text-neutral-950 dark:group-hover:text-neutral-200 transition-colors mt-1 sm:mt-0">
+                            Tired of scrolling to find the reference? Bring the citation up to your text to compare!
+                        </p>
+                    </button>
+
+                </div>
+
+                <!-- Minimalist Footer Action -->
+                <div class="mt-6 pt-5 border-t border-neutral-200 dark:border-white/[0.08] flex items-center justify-end px-2">
+                    <button onclick="setPaperMode(currentPaperMode === 'after' ? 'before' : 'after')" class="inline-flex items-center gap-2.5 text-xs text-emerald-600 dark:text-emeraldGlow hover:underline font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emeraldGlow"></span>
+                        <span>• Toggle Before / After</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 2: MULTILINGUAL DATASET EXPLORER (100VH FULL SCREEN)              -->
+    <!-- ========================================================================= -->
+    <section id="dataset-section" class="relative z-10 w-full min-h-screen lg:h-screen box-border flex items-center max-w-[1400px] mx-auto px-6 sm:px-12 py-16 border-t border-neutral-200 dark:border-white/[0.08]">
+        <div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-12 xl:gap-20 items-center">
+            
+            <!-- Left Pitch -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-700 dark:text-amber-300 text-xs font-medium">
+                    <span>CLASSIFIED LEXICAL DATASET</span>
+                </div>
+                <h2 class="font-display font-bold text-3xl sm:text-4xl lg:text-[42px] text-neutral-950 dark:text-white tracking-tight leading-[1.15]">
+                    25,000+ academic terms classified across 12+ languages.
+                </h2>
+
+                <div class="pt-2 max-w-xs">
+                    <div class="p-5 rounded-2xl bg-white dark:bg-white/[0.03] border border-neutral-200 dark:border-white/10 shadow-sm dark:shadow-none">
+                        <div class="font-display font-bold text-2xl text-amber-600 dark:text-amber-300">&lt; 15ms</div>
+                        <div class="text-xs text-neutral-600 dark:text-neutral-400 mt-1">Instant Local Lookup for Core Academic Jargon</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Interactive Dataset Explorer -->
+            <div class="lg:col-span-7 rounded-2xl bg-white dark:bg-[#111715] border border-neutral-200 dark:border-white/15 p-7 sm:p-9 shadow-xl dark:shadow-2xl space-y-7">
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-neutral-200 dark:border-white/10">
+                    <div>
+                        <h3 class="font-display font-bold text-lg text-neutral-900 dark:text-white">Live Lexical Dataset Explorer</h3>
+                        <p class="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">Select a classified word from the paper to inspect multi-language & domain breakdowns:</p>
+                    </div>
+                    <!-- Term Selector Pills -->
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="selectDatasetWord(0)" id="ds-word-0" class="px-3.5 py-1.5 rounded-lg text-xs font-monoFeature bg-emeraldGlow text-obsidian font-semibold transition">concomitant</button>
+                        <button onclick="selectDatasetWord(1)" id="ds-word-1" class="px-3.5 py-1.5 rounded-lg text-xs font-monoFeature bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white border border-neutral-200 dark:border-white/10 transition">paucity</button>
+                        <button onclick="selectDatasetWord(2)" id="ds-word-2" class="px-3.5 py-1.5 rounded-lg text-xs font-monoFeature bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white border border-neutral-200 dark:border-white/10 transition">proliferation</button>
+                    </div>
+                </div>
+
+                <!-- Selected Word Breakdown Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="p-5 rounded-xl bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 space-y-1.5">
+                        <div class="text-[10px] font-monoFeature uppercase text-neutral-500">CEFR & Tier Class</div>
+                        <div id="ds-cefr" class="font-display font-bold text-base text-amber-600 dark:text-amber-300">C2 • Academic Tier 1</div>
+                        <div id="ds-pos" class="text-xs text-neutral-600 dark:text-neutral-400">Adjective • Formal</div>
+                    </div>
+                    <div class="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emeraldGlow/30 space-y-1.5 sm:col-span-2">
+                        <div class="text-[10px] font-monoFeature uppercase text-emerald-700 dark:text-emeraldGlow">Plain English Equivalent</div>
+                        <div id="ds-simple-en" class="font-display font-bold text-base text-neutral-900 dark:text-white">"happening at the same time; accompanying"</div>
+                        <div id="ds-context-note" class="text-xs text-neutral-700 dark:text-neutral-300">Used when two trends expand together (e.g., electricity demand + grid size).</div>
+                    </div>
+                </div>
+
+                <!-- Multilingual Translations Strip -->
+                <div class="space-y-3">
+                    <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">Verified Native Dataset Translations:</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                        <div class="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200 dark:border-white/10 flex items-center justify-between">
+                            <span class="text-neutral-600 dark:text-neutral-400 font-monoFeature">🇮🇩 Bahasa Indonesia</span>
+                            <span id="ds-lang-id" class="font-semibold text-neutral-900 dark:text-white">yang menyertai / terjadi bersamaan</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200 dark:border-white/10 flex items-center justify-between">
+                            <span class="text-neutral-600 dark:text-neutral-400 font-monoFeature">🇪🇸 Español</span>
+                            <span id="ds-lang-es" class="font-semibold text-neutral-900 dark:text-white">simultáneo / que acompaña</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200 dark:border-white/10 flex items-center justify-between">
+                            <span class="text-neutral-600 dark:text-neutral-400 font-monoFeature">🇨🇳 中文 (Simplified)</span>
+                            <span id="ds-lang-zh" class="font-semibold text-neutral-900 dark:text-white">伴随的 / 同时发生的</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200 dark:border-white/10 flex items-center justify-between">
+                            <span class="text-neutral-600 dark:text-neutral-400 font-monoFeature">🇯🇵 日本語</span>
+                            <span id="ds-lang-ja" class="font-semibold text-neutral-900 dark:text-white">付随する / 同時に起こる</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 3: "YOU MIGHT LOVE IT" TARGET AUDIENCE SECTION (100VH + FOOTER)   -->
+    <!-- ========================================================================= -->
+    <section id="audience-section" class="relative z-10 w-full min-h-screen lg:h-screen box-border flex flex-col justify-between border-t border-neutral-200 dark:border-white/[0.08] bg-[#F1F5F3] dark:bg-[#040605] overflow-hidden select-none">
+        
+        <!-- Soft Ambient Center Glow Behind "Love it" -->
+        <div class="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[340px] rounded-full bg-emerald-500/[0.08] blur-[110px] pointer-events-none"></div>
+        <div class="absolute top-[32%] left-[46%] -translate-x-1/2 -translate-y-1/2 w-[260px] h-[220px] rounded-full bg-amber-400/[0.06] blur-[90px] pointer-events-none"></div>
+
+        <!-- Upper & Center Focal Artwork + Drifting Target Audience Cloud -->
+        <div class="relative z-10 flex-1 flex flex-col items-center justify-center w-full px-6 pt-12 pb-6">
+            
+            <!-- Center Typographic Lockup -->
+            <div class="flex flex-col items-center text-center">
+                <span class="font-sans font-normal text-3xl sm:text-5xl lg:text-[54px] text-neutral-900 dark:text-white tracking-[0.26em] sm:tracking-[0.32em] mr-[-0.32em] leading-none mb-1 sm:mb-2">
+                    You might
+                </span>
+
+                <h2 class="font-loveSerif font-bold text-7xl sm:text-8xl lg:text-[118px] love-gradient-text leading-[0.95] tracking-tight">
+                    Love
+                </h2>
+
+                <div class="mt-2 sm:mt-3 relative flex items-center justify-center">
+                    <svg class="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 overflow-visible drop-shadow-[0_12px_28px_rgba(82,183,101,0.28)]" viewBox="0 0 88 86" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="itScriptGrad" x1="10" y1="70" x2="75" y2="25" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#84CC16" />
+                                <stop offset="55%" stop-color="#4ADE80" />
+                                <stop offset="100%" stop-color="#15803D" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="25.5" cy="24.5" r="7.5" fill="#FDE68A" fill-opacity="0.85" />
+                        <circle cx="27" cy="17.5" r="9.5" fill="#FACC15" />
+                        <path d="M21 39C18 48 15 60 19.5 62C24 64 34 52 42 41M51 22C48 39 44.5 66 49.5 73C53 78 61.5 71.5 70 61M36 47.5C47 42.5 61.5 36.5 74 33" 
+                              stroke="url(#itScriptGrad)" 
+                              stroke-width="6.8" 
+                              stroke-linecap="round" 
+                              stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Multi-Layered Target Audience Cloud Moving Slowly to the Left -->
+            <div class="audience-stream-container audience-fade-mask w-full max-w-[1440px] mx-auto mt-8 sm:mt-12 space-y-4 sm:space-y-6 overflow-hidden py-2">
+                
+                <!-- Track 1 -->
+                <div class="marquee-track-left-slower items-center">
+                    <div class="flex items-center gap-24 sm:gap-36 px-12 sm:px-18">
+                        <span class="text-base sm:text-xl font-medium text-neutral-500 dark:text-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">Academia</span>
+                        <span class="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white/90 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Postgraduate</span>
+                        <span class="text-sm sm:text-lg font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">Literature Reviewers</span>
+                        <span class="text-lg sm:text-xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Doctoral Candidates</span>
+                        <span class="text-base sm:text-xl font-medium text-neutral-500 dark:text-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">ESL Scholars</span>
+                        <span class="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white/85 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Postgraduate</span>
+                        <span class="text-base sm:text-xl font-medium text-neutral-500 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">Academia</span>
+                        <span class="text-lg sm:text-xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Journal Readers</span>
+                    </div>
+                    <div class="flex items-center gap-24 sm:gap-36 px-12 sm:px-18" aria-hidden="true">
+                        <span class="text-base sm:text-xl font-medium text-neutral-500 dark:text-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">Academia</span>
+                        <span class="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white/90 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Postgraduate</span>
+                        <span class="text-sm sm:text-lg font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">Literature Reviewers</span>
+                        <span class="text-lg sm:text-xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Doctoral Candidates</span>
+                        <span class="text-base sm:text-xl font-medium text-neutral-500 dark:text-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">ESL Scholars</span>
+                        <span class="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white/85 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Postgraduate</span>
+                        <span class="text-base sm:text-xl font-medium text-neutral-500 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-300 transition-colors">Academia</span>
+                        <span class="text-lg sm:text-xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Journal Readers</span>
+                    </div>
+                </div>
+
+                <!-- Track 2 -->
+                <div class="marquee-track-left-slow items-center">
+                    <div class="flex items-center gap-28 sm:gap-40 px-14 sm:px-20">
+                        <span class="text-2xl sm:text-4xl font-display font-semibold text-neutral-950 dark:text-white tracking-tight hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Student</span>
+                        <span class="text-lg sm:text-2xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Researcher</span>
+                        <span class="text-xl sm:text-3xl font-display font-medium text-neutral-900 dark:text-white/95 hover:text-amber-600 dark:hover:text-amber-300 transition-colors">Undergraduate</span>
+                        <span class="text-base sm:text-xl font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">Self-Learners</span>
+                        <span class="text-2xl sm:text-4xl font-display font-semibold text-neutral-950 dark:text-white tracking-tight hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Student</span>
+                        <span class="text-lg sm:text-2xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Researcher</span>
+                        <span class="text-xl sm:text-3xl font-display font-medium text-neutral-900 dark:text-white/95 hover:text-amber-600 dark:hover:text-amber-300 transition-colors">Undergraduate</span>
+                        <span class="text-base sm:text-xl font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">Lab Teams</span>
+                    </div>
+                    <div class="flex items-center gap-28 sm:gap-40 px-14 sm:px-20" aria-hidden="true">
+                        <span class="text-2xl sm:text-4xl font-display font-semibold text-neutral-950 dark:text-white tracking-tight hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Student</span>
+                        <span class="text-lg sm:text-2xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Researcher</span>
+                        <span class="text-xl sm:text-3xl font-display font-medium text-neutral-900 dark:text-white/95 hover:text-amber-600 dark:hover:text-amber-300 transition-colors">Undergraduate</span>
+                        <span class="text-base sm:text-xl font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">Self-Learners</span>
+                        <span class="text-2xl sm:text-4xl font-display font-semibold text-neutral-950 dark:text-white tracking-tight hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Student</span>
+                        <span class="text-lg sm:text-2xl font-medium text-neutral-700 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Researcher</span>
+                        <span class="text-xl sm:text-3xl font-display font-medium text-neutral-900 dark:text-white/95 hover:text-amber-600 dark:hover:text-amber-300 transition-colors">Undergraduate</span>
+                        <span class="text-base sm:text-xl font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">Lab Teams</span>
+                    </div>
+                </div>
+
+                <!-- Track 3 -->
+                <div class="marquee-track-left-medium items-center">
+                    <div class="flex items-center gap-24 sm:gap-36 px-12 sm:px-16">
+                        <span class="text-sm sm:text-lg font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300 transition-colors">Thesis Writers</span>
+                        <span class="text-lg sm:text-2xl font-medium text-neutral-700 dark:text-neutral-300 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Undergraduate</span>
+                        <span class="text-base sm:text-xl font-normal text-neutral-500 dark:text-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-300 transition-colors">Academia</span>
+                        <span class="text-lg sm:text-xl font-medium text-neutral-800 dark:text-white/80 hover:text-neutral-950 dark:hover:text-white transition-colors">Postgraduate</span>
+                        <span class="text-sm sm:text-lg font-normal text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Researcher</span>
+                        <span class="text-xl sm:text-2xl font-semibold text-neutral-950 dark:text-white/90 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Student</span>
+                        <span class="text-sm sm:text-lg font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300 transition-colors">Peer Reviewers</span>
+                    </div>
+                    <div class="flex items-center gap-24 sm:gap-36 px-12 sm:px-16" aria-hidden="true">
+                        <span class="text-sm sm:text-lg font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300 transition-colors">Thesis Writers</span>
+                        <span class="text-lg sm:text-2xl font-medium text-neutral-700 dark:text-neutral-300 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Undergraduate</span>
+                        <span class="text-base sm:text-xl font-normal text-neutral-500 dark:text-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-300 transition-colors">Academia</span>
+                        <span class="text-lg sm:text-xl font-medium text-neutral-800 dark:text-white/80 hover:text-neutral-950 dark:hover:text-white transition-colors">Postgraduate</span>
+                        <span class="text-sm sm:text-lg font-normal text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors">Researcher</span>
+                        <span class="text-xl sm:text-2xl font-semibold text-neutral-950 dark:text-white/90 hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">Student</span>
+                        <span class="text-sm sm:text-lg font-normal text-neutral-500 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300 transition-colors">Peer Reviewers</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Integrated Minimalist Footer -->
+        <footer class="relative z-10 w-full border-t border-neutral-200 dark:border-white/10 bg-[#E8EDE9]/90 dark:bg-[#050706]/90 backdrop-blur-md py-5 shrink-0">
+            <div class="max-w-[1360px] mx-auto px-6 sm:px-12 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <img src="/assets/image/readit_logo.png" alt="READit" class="h-6 w-auto object-contain">
+                    <span class="xs text-neutral-600 dark:text-neutral-500">© 2025 READit Research Tools. Built for students & researchers.</span>
+                </div>
+                <div class="flex items-center gap-6 text-xs text-neutral-600 dark:text-neutral-400">
+                    <a href="/hub" class="hover:text-neutral-950 dark:hover:text-white transition text-emerald-600 dark:text-emeraldGlow">Document Hub</a>
+                    <a href="#features-showcase" class="hover:text-neutral-950 dark:hover:text-white transition">Interactive PDF Demo</a>
+                    <a href="#dataset-section" class="hover:text-neutral-950 dark:hover:text-white transition">Multilingual Dataset</a>
+                    <button onclick="triggerChromeInstall()" class="text-emerald-600 dark:text-emeraldGlow hover:underline font-medium">Install Free Extension →</button>
+                </div>
+            </div>
+        </footer>
+
+    </section>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-white dark:bg-[#121A17] border border-emerald-500/40 dark:border-emeraldGlow/40 text-neutral-900 dark:text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3">
+        <span class="w-2.5 h-2.5 rounded-full bg-emeraldGlow"></span>
+        <span id="toast-message" class="text-sm font-medium">READit Chrome Extension ready to install!</span>
+    </div>
+
+    <!-- Separated Interactive Logic Script -->
+    <script src="/static/js/landing.js"></script>
+</body>
+</html>

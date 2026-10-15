@@ -1,0 +1,319 @@
+/* ===================================================================== */
+/* READit SaaS Landing Page Stylesheet (Light & Dark Theme)              */
+/* ===================================================================== */
+
+html {
+    scroll-behavior: smooth;
+}
+body {
+    background-color: #F8FAF9;
+    color: #0F172A;
+    overflow-x: hidden;
+    font-family: 'Inter', sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html.dark body {
+    background-color: #070A09;
+    color: #F8FAFC;
+}
+
+/* Subtle right-side architectural grid matching mockup */
+.bg-tech-grid {
+    background-size: 46px 46px;
+    background-image: 
+        linear-gradient(to right, rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+    mask-image: radial-gradient(circle at 72% 50%, black 25%, transparent 75%);
+    -webkit-mask-image: radial-gradient(circle at 72% 50%, black 25%, transparent 75%);
+    transition: background-image 0.3s ease;
+}
+
+html.dark .bg-tech-grid {
+    background-image: 
+        linear-gradient(to right, rgba(46, 229, 125, 0.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(46, 229, 125, 0.045) 1px, transparent 1px);
+}
+
+/* Dynamic Parallax Backlight */
+.parallax-emerald-glow {
+    background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.10) 0%, rgba(5, 150, 105, 0.02) 48%, transparent 75%);
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
+}
+
+html.dark .parallax-emerald-glow {
+    background: radial-gradient(circle at 50% 50%, rgba(46, 229, 125, 0.14) 0%, rgba(16, 185, 129, 0.04) 48%, transparent 75%);
+}
+
+/* Glowing Primary Pill Button */
+.btn-emerald-glow {
+    background: linear-gradient(180deg, #38F28B 0%, #26D672 100%);
+    box-shadow: 0 0 28px rgba(46, 229, 125, 0.38), inset 0 1px 1px rgba(255, 255, 255, 0.45);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-emerald-glow:hover {
+    box-shadow: 0 0 38px rgba(46, 229, 125, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.65);
+    transform: translateY(-1.5px);
+}
+.btn-emerald-glow:active {
+    transform: translateY(0px);
+}
+
+/* Tilted 3D Frosted Glass Document Card */
+.document-glass-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 247, 245, 0.96) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.09);
+    box-shadow: 
+        0 20px 50px -10px rgba(0, 0, 0, 0.10),
+        -8px 16px 36px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+    transform: rotate(5.5deg);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s ease, background 0.3s ease, border-color 0.3s ease;
+}
+.document-glass-card:hover {
+    transform: rotate(3.8deg) translateY(-4px);
+    box-shadow: 
+        0 28px 60px -10px rgba(0, 0, 0, 0.15),
+        0 0 35px rgba(16, 185, 129, 0.12),
+        inset 0 1px 1.5px rgba(255, 255, 255, 1);
+}
+
+html.dark .document-glass-card {
+    background: linear-gradient(145deg, rgba(44, 57, 53, 0.52) 0%, rgba(20, 27, 25, 0.72) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 
+        0 32px 64px -12px rgba(0, 0, 0, 0.85),
+        -12px 20px 48px rgba(0, 0, 0, 0.6),
+        inset 0 1px 1px rgba(255, 255, 255, 0.22);
+}
+html.dark .document-glass-card:hover {
+    box-shadow: 
+        0 40px 75px -12px rgba(0, 0, 0, 0.9),
+        0 0 40px rgba(46, 229, 125, 0.08),
+        inset 0 1px 1.5px rgba(255, 255, 255, 0.28);
+}
+
+/* Highlighted Golden Selection Box inside Document */
+.amber-highlight-box {
+    background: linear-gradient(90deg, rgba(250, 204, 21, 0.20) 0%, rgba(234, 179, 8, 0.26) 100%);
+    border: 1px solid rgba(202, 138, 4, 0.65);
+    box-shadow: 0 0 24px rgba(234, 179, 8, 0.16), inset 0 0 10px rgba(234, 179, 8, 0.10);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+html.dark .amber-highlight-box {
+    background: linear-gradient(90deg, rgba(250, 204, 21, 0.16) 0%, rgba(234, 179, 8, 0.22) 100%);
+    border: 1px solid rgba(250, 204, 21, 0.55);
+    box-shadow: 0 0 28px rgba(250, 204, 21, 0.18), inset 0 0 12px rgba(250, 204, 21, 0.08);
+}
+
+.emerald-simplified-box {
+    background: linear-gradient(90deg, rgba(46, 229, 125, 0.20) 0%, rgba(16, 185, 129, 0.28) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.75);
+    box-shadow: 0 0 26px rgba(16, 185, 129, 0.22), inset 0 0 10px rgba(16, 185, 129, 0.12);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+html.dark .emerald-simplified-box {
+    background: linear-gradient(90deg, rgba(46, 229, 125, 0.16) 0%, rgba(16, 185, 129, 0.24) 100%);
+    border: 1px solid rgba(46, 229, 125, 0.6);
+    box-shadow: 0 0 30px rgba(46, 229, 125, 0.22), inset 0 0 12px rgba(46, 229, 125, 0.1);
+}
+
+/* Floating Translation Popover Card */
+.popover-glass-card {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 249, 0.98) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    box-shadow: 
+        0 20px 45px rgba(0, 0, 0, 0.12),
+        inset 0 1px 1px rgba(255, 255, 255, 1);
+    transform: rotate(3deg);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease, border-color 0.3s ease;
+}
+.popover-glass-card:hover {
+    transform: rotate(1.5deg) scale(1.02);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+html.dark .popover-glass-card {
+    background: linear-gradient(160deg, rgba(42, 52, 49, 0.84) 0%, rgba(24, 31, 29, 0.92) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 
+        0 24px 48px rgba(0, 0, 0, 0.8),
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.2);
+}
+html.dark .popover-glass-card:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+}
+
+/* Skeleton Line Hover States */
+.doc-line-group {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.skeleton-bar {
+    background-color: rgba(0, 0, 0, 0.08);
+    transition: background-color 0.2s ease;
+}
+.doc-line-group:hover .skeleton-bar {
+    background-color: rgba(0, 0, 0, 0.18);
+}
+html.dark .skeleton-bar {
+    background-color: rgba(255, 255, 255, 0.20);
+}
+html.dark .doc-line-group:hover .skeleton-bar {
+    background-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Crisp Academic PDF Paper styling */
+.academic-paper-sheet {
+    background-color: #FFFFFF;
+    color: #111827;
+    box-shadow: 
+        0 24px 60px rgba(0, 0, 0, 0.18),
+        0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+html.dark .academic-paper-sheet {
+    box-shadow: 
+        0 28px 70px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* Smooth Accordion inside PDF Reader */
+.pdf-accordion-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.32s ease, margin 0.35s ease;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+.pdf-accordion-wrapper.open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    margin-top: 0.65rem;
+    margin-bottom: 0.65rem;
+}
+.pdf-accordion-inner {
+    overflow: hidden;
+}
+
+/* Highlight spans inside the PDF paper */
+.pdf-highlight-span {
+    transition: all 0.3s ease;
+    border-radius: 6px;
+    padding: 2px 5px;
+    margin: 0 -2px;
+}
+.pdf-highlight-active-translate {
+    background-color: #FEF08A;
+    border-bottom: 2px solid #CA8A04;
+    color: #000;
+    cursor: pointer;
+}
+.pdf-highlight-active-reference {
+    background-color: #DCFCE7;
+    border-bottom: 2px solid #16A34A;
+    color: #064E3B;
+    cursor: pointer;
+}
+.pdf-highlight-antecedent {
+    background-color: #E0E7FF;
+    border: 1px dashed #4F46E5;
+    color: #1E1B4B;
+}
+.pdf-highlight-active-citation {
+    background-color: #DBEAFE;
+    border-bottom: 2px solid #2563EB;
+    color: #1E3A8A;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Sliding Green Feature Block */
+.feature-green-slider {
+    background: linear-gradient(95deg, #065527 0%, #277E30 52%, #679B32 100%);
+    box-shadow: 
+        0 24px 54px -12px rgba(46, 229, 125, 0.32),
+        inset 0 1px 1.5px rgba(255, 255, 255, 0.35);
+    transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Custom subtle scrollbar for internal PDF Reader scroll */
+.pdf-scroll-viewport::-webkit-scrollbar {
+    width: 8px;
+}
+.pdf-scroll-viewport::-webkit-scrollbar-track {
+    background: #141A18;
+}
+.pdf-scroll-viewport::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 9999px;
+}
+.pdf-scroll-viewport::-webkit-scrollbar-thumb:hover {
+    background: rgba(46, 229, 125, 0.45);
+}
+
+/* ===================================================================== */
+/* "YOU MIGHT LOVE IT" SECTION & SLOW LEFTWARD AUDIENCE MARQUEE          */
+/* ===================================================================== */
+.love-gradient-text {
+    background: linear-gradient(92deg, #CA8A04 0%, #65A30D 35%, #059669 70%, #16A34A 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 10px 24px rgba(22, 163, 74, 0.15));
+}
+html.dark .love-gradient-text {
+    background: linear-gradient(92deg, #FACC15 0%, #A3E635 45%, #34D399 80%, #22C55E 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 12px 32px rgba(74, 222, 128, 0.18));
+}
+
+.audience-fade-mask {
+    mask-image: linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
+}
+
+@keyframes moveSlowLeft {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+    100% {
+        transform: translate3d(-50%, 0, 0);
+    }
+}
+
+.marquee-track-left-slow {
+    display: flex;
+    width: max-content;
+    animation: moveSlowLeft 48s linear infinite;
+}
+.marquee-track-left-slower {
+    display: flex;
+    width: max-content;
+    animation: moveSlowLeft 64s linear infinite;
+}
+.marquee-track-left-medium {
+    display: flex;
+    width: max-content;
+    animation: moveSlowLeft 38s linear infinite;
+}
+
+.audience-stream-container:hover .marquee-track-left-slow,
+.audience-stream-container:hover .marquee-track-left-slower,
+.audience-stream-container:hover .marquee-track-left-medium {
+    animation-play-state: paused;
+}
+
+/* ===================================================================== */
+/* SMART SCROLL HEADER & MOBILE MENU ANIMATIONS                         */
+/* ===================================================================== */
+.site-header {
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease, border-color 0.3s ease;
+    will-change: transform;
+}
+.site-header.header-hidden {
+    transform: translateY(-100%);
+}

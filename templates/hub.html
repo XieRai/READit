@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>READit — Document Hub</title>
+    
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Tailwind Configuration -->
+    <script src="/static/js/tailwind-config.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Separated Custom Document Hub Stylesheet -->
+    <link rel="stylesheet" href="/static/css/hub.css">
+</head>
+<body class="h-screen w-screen overflow-hidden flex select-none bg-hubCanvas text-white">
+
+    <!-- Hidden File Input for "+ New File" Upload Card -->
+    <input type="file" id="hub-pdf-upload-input" accept=".pdf" class="hidden" onchange="handleNewFileUpload(event)" />
+
+    <!-- ========================================================================= -->
+    <!-- LEFT SIDEBAR (w-[240px], #1B1B1B, 100vh)                                  -->
+    <!-- ========================================================================= -->
+    <aside class="w-[240px] h-screen bg-hubSidebar border-r border-white/[0.08] flex flex-col justify-between shrink-0 z-20">
+        
+        <!-- Top Brand Logo & Navigation Pills -->
+        <div>
+            <!-- Top Header (h-[76px]) with Centered Brand 'it' Logo from assets/image -->
+            <div class="h-[76px] border-b border-white/[0.08] flex items-center justify-center px-6">
+                <a href="/" class="group flex items-center justify-center focus:outline-none" title="Return to READit Landing Page">
+                    <img src="/assets/image/readit_icon.png" alt="READit" class="h-10 w-auto object-contain hover:scale-105 transition-transform" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <svg class="w-9 h-9 overflow-visible hidden" viewBox="0 0 44 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Double-layered golden-yellow dot matching wireframe -->
+                        <circle cx="13" cy="11.5" r="3.4" fill="#FDE68A" fill-opacity="0.85" />
+                        <circle cx="14" cy="8.5" r="4.3" fill="#FACC15" class="group-hover:scale-110 transition-transform origin-center" />
+                        <!-- Handwritten 'it' green stroke -->
+                        <path d="M11.5 18.5C9.8 23.5 8.2 29.5 10.2 30.5C12.2 31.5 17.2 25.5 20.8 20.5M25.2 11.2C23.6 19.5 21.8 31.8 24.2 35.2C25.8 37.5 30 34.5 34 29.5M18.2 23.5C23.2 21.2 30.2 18.2 36.2 16.5" 
+                              stroke="#76B843" 
+                              stroke-width="3.4" 
+                              stroke-linecap="round" 
+                              stroke-linejoin="round"/>
+                    </svg>
+                </a>
+            </div>
+
+            <!-- Navigation Pills (My Docs, Shared Docs, Resources) -->
+            <nav class="px-8 py-9 space-y-4">
+                <button onclick="switchHubTab('my-docs')" id="hub-nav-my-docs" class="w-full py-1.5 px-4 rounded-full text-[13px] font-normal border border-white/70 text-white bg-white/[0.02] transition text-center focus:outline-none">
+                    My Docs
+                </button>
+                <button onclick="switchHubTab('shared-docs')" id="hub-nav-shared-docs" class="w-full py-1.5 px-4 rounded-full text-[13px] font-normal border border-white/[0.12] text-white/35 hover:text-white/75 hover:border-white/30 transition text-center focus:outline-none">
+                    Shared Docs
+                </button>
+                <button onclick="switchHubTab('resources')" id="hub-nav-resources" class="w-full py-1.5 px-4 rounded-full text-[13px] font-normal border border-white/[0.12] text-white/35 hover:text-white/75 hover:border-white/30 transition text-center focus:outline-none">
+                    Resources
+                </button>
+            </nav>
+        </div>
+
+        <!-- Bottom-Anchored Account Drawer (Nama Akun / Free plan) -->
+        <div class="border-t border-white/[0.08] bg-hubSidebar px-5 py-4">
+            <!-- Account Trigger Row -->
+            <button onclick="toggleAccountMenu()" class="w-full flex items-center justify-between text-left group focus:outline-none py-0.5">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-7 h-7 rounded-full bg-[#7C7C7C] shrink-0"></div>
+                    <div class="truncate">
+                        <div class="text-[14.5px] font-normal text-white leading-tight truncate">Nama Akun</div>
+                        <div class="text-[10.5px] text-white/75 leading-tight mt-0.5">Free plan</div>
+                    </div>
+                </div>
+                <!-- Rotating Chevron Arrow -->
+                <svg id="account-chevron-icon" class="w-4 h-4 text-[#7C7C7C] group-hover:text-white transition-transform duration-200 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+            </button>
+
+            <!-- Expandable Account Links -->
+            <div id="hub-account-drawer" class="hub-account-drawer">
+                <div class="hub-account-drawer-inner">
+                    <div class="pt-5 pb-1 pl-2 space-y-3 text-[12px] text-white/90">
+                        <button onclick="openAccountModal('settings')" class="block w-full text-left hover:text-readitGreen transition focus:outline-none">
+                            Settings
+                        </button>
+                        <button onclick="openAccountModal('preference')" class="block w-full text-left hover:text-readitGreen transition focus:outline-none">
+                            Preference
+                        </button>
+                        <button onclick="openAccountModal('privacy')" class="block w-full text-left hover:text-readitGreen transition focus:outline-none">
+                            Privacy and Policy
+                        </button>
+                        <a href="/" class="block w-full text-left text-neutral-400 hover:text-white transition focus:outline-none pt-0.5">
+                            ← Return to Landing
+                        </a>
+                        <button onclick="handleLogoutAction()" class="block w-full text-left text-white/90 hover:text-rose-400 transition focus:outline-none pt-0.5">
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ========================================================================= -->
+    <!-- RIGHT MAIN WORKSPACE CANVAS (flex-1, #202020, scrollable)                 -->
+    <!-- ========================================================================= -->
+    <main class="flex-1 h-screen overflow-y-auto bg-hubCanvas relative">
+        
+        <!-- VIEW A: DOCUMENT HUB DASHBOARD -->
+        <div id="hub-dashboard-view" class="px-10 sm:px-16 lg:px-24 py-14 max-w-[1280px]">
+            
+            <!-- SECTION 1: Guides and Tutorial -->
+            <section id="hub-guides-section">
+                <h2 class="text-[15px] font-semibold text-white tracking-wide mb-4">
+                    Guides and Tutorial
+                </h2>
+
+                <!-- 4 Minimalist Rounded Video Boxes (#232323, subtle border) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-[920px]">
+                    
+                    <!-- Video Guide Card 1 -->
+                    <button onclick="openGuideVideoModal(0)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                        <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">01 · Hover &amp; Click</span>
+                        <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+                            <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                            </svg>
+                        </div>
+                        <span class="absolute bottom-3 right-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">0:45</span>
+                    </button>
+
+                    <!-- Video Guide Card 2 -->
+                    <button onclick="openGuideVideoModal(1)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                        <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">02 · Translating Idea</span>
+                        <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+                            <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                            </svg>
+                        </div>
+                        <span class="absolute bottom-3 right-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">1:12</span>
+                    </button>
+
+                    <!-- Video Guide Card 3 -->
+                    <button onclick="openGuideVideoModal(2)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                        <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">03 · Quick Reference</span>
+                        <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+                            <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                            </svg>
+                        </div>
+                        <span class="absolute bottom-3 right-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">0:58</span>
+                    </button>
+
+                    <!-- Video Guide Card 4 -->
+                    <button onclick="openGuideVideoModal(3)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                        <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">04 · Easy Citation</span>
+                        <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+                            <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                            </svg>
+                        </div>
+                        <span class="absolute bottom-3 right-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">1:05</span>
+                    </button>
+
+                </div>
+            </section>
+
+            <!-- SECTION 2: Recent Document ▼ -->
+            <section class="mt-12">
+                <div class="flex items-center gap-2 mb-5">
+                    <button onclick="toggleRecentDocumentsGrid()" class="inline-flex items-center gap-2.5 text-[15px] font-semibold text-white hover:text-white/85 focus:outline-none">
+                        <span id="hub-section-heading">Recent Document</span>
+                        <span id="recent-dropdown-triangle" class="text-[11px] text-white transition-transform duration-200">▼</span>
+                    </button>
+                </div>
+
+                <!-- Document Grid: Slot 1 is ALWAYS "+ New File" Upload Card, Slot 2 is "Demo File" -->
+                <div id="hub-documents-grid" class="flex flex-wrap items-start gap-8 transition-opacity duration-200">
+                    
+                    <!-- SLOT 1 (ALWAYS FIRST / LOCKED TOP-LEFT): "+ New File" Upload Card -->
+                    <div class="flex flex-col items-center">
+                        <button onclick="triggerNewFilePicker()" 
+                                ondragover="handleDragOver(event)" 
+                                ondragleave="handleDragLeave(event)" 
+                                ondrop="handleFileDrop(event)"
+                                id="new-file-dropcard"
+                                title="Click or drop a PDF file to upload"
+                                class="upload-card-interactive w-[175px] h-[225px] rounded-[14px] bg-hubCard flex items-center justify-center group focus:outline-none">
+                            <!-- Centered Thin Crosshair '+' Icon -->
+                            <svg class="w-12 h-12 text-white/25 group-hover:text-white/75 transition-colors stroke-[1]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
+                                <line x1="24" y1="8" x2="24" y2="40"></line>
+                                <line x1="8" y1="24" x2="40" y2="24"></line>
+                            </svg>
+                        </button>
+                        <span class="mt-2.5 text-[11px] font-semibold text-white tracking-wide">
+                            New File
+                        </span>
+                    </div>
+
+                    <!-- Dynamic Document Cards Injected Here (Starts with Demo File in Slot 2) -->
+                    <div id="hub-dynamic-docs-list" class="contents"></div>
+
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VIEW B: INTERACTIVE SMART SENTENCE READER WORKSPACE                   -->
+        <!-- ========================================================================= -->
+        <div id="hub-reader-view" class="hidden flex-col h-screen w-full bg-[#181818]">
+            
+            <!-- Minimalist Reader Top Bar -->
+            <div class="h-14 border-b border-white/[0.08] bg-hubSidebar px-6 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-4 min-w-0">
+                    <button onclick="closeSmartReader()" class="inline-flex items-center gap-2 text-xs font-medium text-white/70 hover:text-white transition px-3 py-1.5 rounded-full border border-white/15 hover:border-white/35">
+                        <span>←</span>
+                        <span>Back to My Docs</span>
+                    </button>
+                    <span class="h-4 w-[1px] bg-white/10"></span>
+                    <span id="reader-doc-title" class="text-xs sm:text-sm font-medium text-white truncate">
+                        Demo File — Arc fault detection using artificial intelligence
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="/reader" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-readitGreen hover:underline font-mono">
+                        <span>Open in Dedicated Reader ↗</span>
+                    </a>
+                    <span class="hidden md:inline-block text-[11px] text-white/45">
+                        Hover any sentence to highlight • Click to open inline guide
+                    </span>
+                    <div class="flex items-center bg-[#252525] border border-white/10 rounded-full p-0.5 text-[11px]">
+                        <button onclick="setReaderLang('en')" id="reader-lang-en" class="px-3 py-1 rounded-full bg-readitGreen text-black font-semibold transition">Simple EN</button>
+                        <button onclick="setReaderLang('id')" id="reader-lang-id" class="px-3 py-1 rounded-full text-white/60 hover:text-white transition">Bahasa ID</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scrollable Paper Canvas with Whole-Sentence Hover & Click Guide -->
+            <div class="flex-1 overflow-y-auto p-6 sm:p-10 flex justify-center bg-hubCanvas">
+                <div class="academic-paper-sheet w-full max-w-[820px] rounded-xl p-8 sm:p-12 font-serifPaper text-[#111827] leading-[1.78] h-fit select-text">
+                    
+                    <!-- Journal Top Header -->
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between pb-4 mb-5 border-b-2 border-neutral-800 gap-4">
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-11 h-11 rounded-full border border-[#0284C7] flex items-center justify-center relative overflow-hidden shrink-0 text-[#0284C7]">
+                                    <svg class="w-10 h-10 opacity-85" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.1">
+                                        <circle cx="20" cy="20" r="16"/>
+                                        <ellipse cx="20" cy="20" rx="8" ry="16"/>
+                                        <line x1="4" y1="14" x2="36" y2="14"/>
+                                        <line x1="4" y1="20" x2="36" y2="20"/>
+                                        <line x1="4" y1="26" x2="36" y2="26"/>
+                                    </svg>
+                                    <span class="absolute bg-white px-1 font-sans font-black text-[9px] tracking-tighter text-[#0369A1]">AIMS</span>
+                                </div>
+                                <div class="text-[#0284C7] italic text-[14px] leading-snug">
+                                    <div>Mathematical Biosciences</div>
+                                    <div>and Engineering</div>
+                                </div>
+                            </div>
+                            <div class="text-[10.5px] text-neutral-600">http://www.aimspress.com/journal/mbe</div>
+                        </div>
+                        <div class="text-[10.5px] text-neutral-800 leading-[1.45]">
+                            <div>MBE, 20(7): 12404–12432.</div>
+                            <div>DOI: 10.3934/mbe.2023552</div>
+                            <div>Received: 10 February 2023</div>
+                            <div>Accepted: 15 May 2023</div>
+                            <div>Published: 23 May 2023</div>
+                        </div>
+                    </div>
+
+                    <!-- Paper Title, Authors & Affiliations -->
+                    <div class="mb-5 space-y-2">
+                        <div class="italic text-xs text-neutral-700">Review</div>
+                        <h1 id="reader-paper-heading" class="font-bold text-xl sm:text-[21px] text-black leading-[1.3]">
+                            Arc fault detection using artificial intelligence: Challenges and benefits
+                        </h1>
+                        <div class="font-bold text-[13px] text-black">
+                            Chunpeng Tian<sup>1</sup>, Zhaoyang Xu<sup>2</sup>, Lukun Wang<sup>1</sup> and Yunjie Liu<sup>3,</sup>*
+                        </div>
+                        <div class="text-[11px] text-neutral-700 leading-[1.45] space-y-0.5 pt-0.5">
+                            <div><sup>1</sup> College of Intelligent Equipment, Shandong University of Science and Technology, Taian 271019, China</div>
+                            <div><sup>2</sup> University of Cambridge, Wellcome-MRC Cambridge Stem Cell Institute, Cambridge, England</div>
+                            <div><sup>3</sup> School of Communication Engineering, Taishan College of Science and Technology, Taian 271038, China</div>
+                        </div>
+                        <div class="text-[11px] text-neutral-800 pt-0.5">
+                            <span class="font-bold">* Correspondence:</span> Email: China.alsiaHappyduobi@gmail.com.
+                        </div>
+                    </div>
+
+                    <!-- Interactive Abstract (Every sentence is hover-selectable & clickable) -->
+                    <div class="text-[14.5px] text-neutral-900 leading-[1.8] text-justify space-y-3">
+                        <div>
+                            <span class="font-bold text-black">Abstract: </span>
+                            <span onclick="selectReaderSentence(0)" id="rsent-0" class="readit-sentence">This systematic review aims to investigate recent developments in the area of arc fault detection.</span>
+                            <span onclick="selectReaderSentence(1)" id="rsent-1" class="readit-sentence active-sentence">The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults and the likelihood of related fires, presenting a matter of considerable concern.</span>
+                            <span onclick="selectReaderSentence(2)" id="rsent-2" class="readit-sentence">To address this challenge, this review focuses on the role of artificial intelligence (AI) in arc fault detection, with the objective of illuminating its advantages and identifying current limitations.</span>
+                            <span onclick="selectReaderSentence(3)" id="rsent-3" class="readit-sentence">Through a meticulous literature selection process, a total of 63 articles were included in the final analysis.</span>
+                            <span onclick="selectReaderSentence(4)" id="rsent-4" class="readit-sentence">Simultaneously, three major challenges were also identified, including missed and false detections, the restricted application of neural networks and the paucity of relevant data.</span>
+                            <span onclick="selectReaderSentence(5)" id="rsent-5" class="readit-sentence">In conclusion, AI has exhibited tremendous potential for transforming the field of arc fault detection and holds substantial promise for enhancing electrical safety.</span>
+                        </div>
+
+                        <!-- Dynamic Inline Before / After Guide Accordion -->
+                        <div id="reader-inline-guide" class="font-sans text-left pt-2 pb-1">
+                            <div class="rounded-2xl bg-[#161B18] text-white p-5 sm:p-6 border border-readitGreen/50 shadow-xl space-y-4">
+                                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-readitGreen"></span>
+                                        <span id="rguide-badge" class="text-[11px] font-monoFeature uppercase tracking-wider text-readitGreen font-semibold">
+                                            SENTENCE 02 • TRANSLATING IDEA + LEXICAL HIT
+                                        </span>
+                                    </div>
+                                    <span class="text-[11px] text-neutral-400">Click any sentence in the paper to switch</span>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                                        <div class="text-[10px] font-monoFeature uppercase text-amber-300">Before (Selected Sentence)</div>
+                                        <p id="rguide-before" class="text-xs text-neutral-300 italic leading-relaxed">
+                                            "The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults..."
+                                        </p>
+                                    </div>
+                                    <div class="p-3.5 rounded-xl bg-readitGreen/10 border border-readitGreen/35 space-y-1">
+                                        <div class="text-[10px] font-monoFeature uppercase text-readitGreen" id="rguide-after-label">After (READit Plain Breakdown)</div>
+                                        <p id="rguide-after" class="text-xs sm:text-[13px] text-white font-medium leading-relaxed">
+                                            "As electricity use grows and power grids expand at the same time, dangerous electrical sparks (arc faults) and fires are much more likely to happen."
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div id="rguide-extra" class="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-[11px]">
+                                    <span class="text-neutral-400">Detected Terms:</span>
+                                    <span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30">
+                                        <strong>concomitant</strong> (C2) → happening at the same time
+                                    </span>
+                                    <span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30">
+                                        <strong>heightened</strong> (C1) → increased
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-1 pb-3 border-b-2 border-neutral-800 text-[12px] text-neutral-900">
+                            <span class="font-bold">Keywords:</span> arc fault detection; artificial intelligence; detection methods; arc fault location; electric fire
+                        </div>
+
+                        <!-- Section 1: Introduction -->
+                        <div class="pt-2">
+                            <div class="font-bold text-black text-[13.5px] mb-1.5">1. Introduction</div>
+                            <p class="indent-6">
+                                <span onclick="selectReaderSentence(6)" id="rsent-6" class="readit-sentence">The proliferation of urbanization and industrialization has resulted in a surging demand for energy, necessitating the development of new and efficient energy systems.</span>
+                                <span onclick="selectReaderSentence(7)" id="rsent-7" class="readit-sentence">Nonetheless, the outdated nature of current photovoltaic and energy storage systems has given rise to numerous incidents of arc faults [1].</span>
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 1: VIDEO GUIDE PREVIEW MODAL                                        -->
+    <!-- ========================================================================= -->
+    <div id="hub-video-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="w-full max-w-lg rounded-2xl bg-[#242424] border border-white/15 p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 id="video-modal-title" class="text-sm font-semibold text-white">01 · Hover &amp; Click Sentence</h3>
+                <button onclick="closeGuideVideoModal()" class="text-white/50 hover:text-white text-sm focus:outline-none">✕</button>
+            </div>
+            <div class="aspect-video rounded-xl bg-[#181818] border border-white/10 flex flex-col items-center justify-center p-6 text-center space-y-2.5">
+                <div class="w-12 h-12 rounded-full bg-readitGreen/20 border border-readitGreen/50 flex items-center justify-center text-readitGreen mb-1">
+                    ▶
+                </div>
+                <p id="video-modal-desc" class="text-xs text-white/80 max-w-sm leading-relaxed">
+                    Hover over any sentence in your PDF to highlight it automatically. Click once to open the inline breakdown accordion without losing your reading spot.
+                </p>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeGuideVideoModal()" class="px-4 py-2 rounded-full border border-white/15 text-white/75 hover:text-white text-xs font-medium transition">
+                    Close
+                </button>
+                <button onclick="closeGuideVideoModal(); openSmartReader('Demo File');" class="px-4 py-2 rounded-full bg-readitGreen text-black text-xs font-semibold hover:brightness-110 transition">
+                    Try in Demo File →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 2: ACCOUNT DRAWER MODALS (Settings, Preference, Privacy & Policy)   -->
+    <!-- ========================================================================= -->
+    <div id="hub-account-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="w-full max-w-md rounded-2xl bg-[#242424] border border-white/15 p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 id="account-modal-title" class="text-sm font-semibold text-white">Settings</h3>
+                <button onclick="closeAccountModal()" class="text-white/50 hover:text-white text-sm focus:outline-none">✕</button>
+            </div>
+
+            <div id="account-modal-body" class="space-y-4 text-xs text-white/80">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-white/10">
+                <button onclick="saveAccountModal()" class="px-5 py-2 rounded-full bg-readitGreen text-black text-xs font-semibold hover:brightness-110 transition">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Minimalist Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-[#181818] border border-white/15 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5">
+        <span class="w-2 h-2 rounded-full bg-readitGreen"></span>
+        <span id="toast-message" class="text-xs font-medium">Action completed</span>
+    </div>
+
+    <!-- Separated Document Hub Controller Script -->
+    <script src="/static/js/hub.js"></script>
+
+</body>
+</html>

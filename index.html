@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attention Is All You Need — Interactive Academic Reader</title>
+
+  <!-- KaTeX for crisp academic math typesetting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+          onload="initMathRendering()"></script>
+
+  <!-- Google Fonts: Inter for UI & Source Serif 4 / Newsreader for scholarly text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       CSS Custom Properties / Theming
+       ========================================================================== */
+    :root {
+      --font-body: 'Newsreader', Georgia, Cambria, serif;
+      --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+
+      /* Light Theme (Default: Academic Classic) */
+      --bg-page: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --bg-tag: #e2e8f0;
+      
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      
+      --border-subtle: #e2e8f0;
+      --border-medium: #cbd5e1;
+      --border-accent: #3b82f6;
+
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.08);
+      --accent-hover: #1d4ed8;
+
+      --purple-accent: #7c3aed;
+      --amber-accent: #d97706;
+      --emerald-accent: #059669;
+
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+      --shadow-toolbar: 0 12px 28px -4px rgba(15, 23, 42, 0.22), 0 4px 8px -2px rgba(15, 23, 42, 0.08);
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius-pill: 9999px;
+
+      --content-max-width: 780px;
+      --content-font-size: 1.15rem;
+      --line-height-body: 1.78;
+    }
+
+    [data-theme="sepia"] {
+      --bg-page: #fbf7ee;
+      --bg-surface: #f4ecd8;
+      --bg-surface-elevated: #f8f2e2;
+      --bg-subtle: #ebdcb9;
+      --bg-tag: #e3d2aa;
+      --text-main: #382c1e;
+      --text-muted: #6e5840;
+      --text-light: #968067;
+      --border-subtle: #e0d0b0;
+      --border-medium: #cdb992;
+      --accent: #b45309;
+      --accent-soft: rgba(180, 83, 9, 0.12);
+      --accent-hover: #92400e;
+    }
+
+    [data-theme="dark"] {
+      --bg-page: #0f172a;
+      --bg-surface: #1e293b;
+      --bg-surface-elevated: #334155;
+      --bg-subtle: #1e293b;
+      --bg-tag: #334155;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-light: #64748b;
+      --border-subtle: #334155;
+      --border-medium: #475569;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, 0.15);
+      --accent-hover: #93c5fd;
+      --purple-accent: #a78bfa;
+      --amber-accent: #fbbf24;
+      --emerald-accent: #34d399;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.5);
+      --shadow-toolbar: 0 16px 36px rgba(0, 0, 0, 0.65);
+    }
+
+    /* ==========================================================================
+       Reset & Base Styles
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      font-size: var(--content-font-size);
+      line-height: var(--line-height-body);
+      transition: background-color 0.25s ease, color 0.25s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+      background: rgba(59, 130, 246, 0.24);
+      color: inherit;
+    }
+
+    /* ==========================================================================
+       Reading Progress Bar
+       ========================================================================== */
+    #reading-progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: transparent;
+      z-index: 1000;
+    }
+    #reading-progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      transition: width 0.1s linear;
+    }
+
+    /* ==========================================================================
+       Header & Navigation Bar
+       ========================================================================== */
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 999;
+      background: var(--bg-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .nav-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .paper-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text-main);
+      text-decoration: none;
+    }
+
+    .paper-brand-badge {
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+    }
+
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-ui);
+    }
+
+    .btn-icon {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.65rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+      background: var(--bg-tag);
+      color: var(--text-main);
+      border-color: var(--border-medium);
+    }
+
+    .theme-select {
+      display: flex;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      padding: 2px;
+    }
+
+    .theme-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      border-radius: var(--radius-pill);
+      transition: all 0.2s ease;
+    }
+
+    .theme-btn.active {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ==========================================================================
+       Main Layout (TOC + Paper Reader)
+       ========================================================================== */
+    .app-container {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 6rem;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 3.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .app-container {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        padding-top: 1rem;
+      }
+      .toc-sidebar {
+        display: none;
+      }
+    }
+
+    /* Sidebar TOC */
+    .toc-sidebar {
+      position: sticky;
+      top: 5rem;
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      border-right: 1px solid var(--border-subtle);
+      padding-right: 1.5rem;
+    }
+
+    .toc-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-light);
+      margin-bottom: 0.85rem;
+      font-weight: 700;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .toc-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.35rem 0.6rem;
+      border-radius: var(--radius-sm);
+      display: block;
+      transition: all 0.2s ease;
+      line-height: 1.35;
+    }
+
+    .toc-link:hover {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .toc-link.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+      font-weight: 600;
+    }
+
+    /* Reader Main Column */
+    .reader-article {
+      max-width: var(--content-max-width);
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header & Meta */
+    .paper-header {
+      margin-bottom: 2.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 2rem;
+    }
+
+    .paper-venue-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: var(--font-ui);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-pill);
+      margin-bottom: 1.25rem;
+    }
+
+    .paper-title {
+      font-size: 2.35rem;
+      line-height: 1.22;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .paper-authors {
+      font-family: var(--font-ui);
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 0.75rem;
+    }
+
+    .paper-affiliations {
+      font-family: var(--font-ui);
+      font-size: 0.82rem;
+      color: var(--text-light);
+      font-style: italic;
+    }
+
+    /* Interactive Instruction Callout */
+    .interactive-guide-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-medium);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.4rem;
+      margin-bottom: 2.5rem;
+      font-family: var(--font-ui);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .guide-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .guide-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .guide-features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 0.75rem;
+    }
+
+    .feature-chip {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      padding: 0.2rem 0.65rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Abstract Block */
+    .abstract-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.75rem 2rem;
+      margin-bottom: 3rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .abstract-label {
+      font-family: var(--font-ui);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.85rem;
+    }
+
+    .abstract-text {
+      font-size: 1.05rem;
+      line-height: 1.8;
+      color: var(--text-main);
+      font-style: italic;
+    }
+
+    /* Typography inside content */
+    h2.section-heading {
+      font-size: 1.65rem;
+      font-weight: 700;
+      margin: 2.75rem 0 1.25rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+      scroll-margin-top: 4.5rem;
+    }
+
+    h3.sub-heading {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 1.8rem 0 0.85rem;
+      color: var(--text-main);
+      scroll-margin-top: 4.5rem;
+    }
+
+    p {
+      margin-bottom: 1.45rem;
+      text-align: justify;
+      hyphens: auto;
+    }
+
+    .highlight-term {
+      border-bottom: 1.5px dotted var(--accent);
+      cursor: help;
+      transition: background-color 0.15s ease;
+    }
+    .highlight-term:hover {
+      background: var(--accent-soft);
+    }
+
+    /* ==========================================================================
+       FORMULA ACCORDION COMPONENT
+       (Smooth CSS expansion using modern grid-template-rows: 0fr -> 1fr)
+       ========================================================================== */
+    .formula-accordion-block {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      margin: 2rem 0;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+      overflow: hidden;
+    }
+
+    .formula-accordion-block:hover {
+      border-color: var(--border-medium);
+      box-shadow: var(--shadow-md);
+    }
+
+    .formula-accordion-block.open {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Main Displayed Math Area */
+    .formula-header {
+      padding: 1.25rem 1.5rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      position: relative;
+    }
+
+    .formula-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-ui);
+      font-size: 0.78rem;
+    }
+
+    .formula-tag {
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-sm);
+    }
+
+    .formula-eq-number {
+      color: var(--text-light);
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+
+    .formula-latex-stage {
+      padding: 0.75rem 0;
+      overflow-x: auto;
+      text-align: center;
+      font-size: 1.22rem;
+      color: var(--text-main);
+    }
+
+    /* Accordion Toggle Bar */
+    .formula-toggle-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: var(--bg-subtle);
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: background-color 0.2s ease, color 0.2s ease;
+      text-align: left;
+    }
+
+    .formula-toggle-trigger:hover {
+      background: var(--bg-tag);
+      color: var(--text-main);
+    }
+
+    .toggle-label-group {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .toggle-chevron {
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+    }
+
+    .formula-accordion-block.open .toggle-chevron {
+      transform: rotate(180deg);
+    }
+
+    .open-state-indicator {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-pill);
+    }
+
+    /* CSS Grid 0fr -> 1fr Smooth Expansion */
+    .formula-accordion-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .formula-accordion-block.open .formula-accordion-body {
+      grid-template-rows: 1fr;
+    }
+
+    .formula-accordion-inner {
+      overflow: hidden;
+      background: var(--bg-surface);
+      border-top: 1px dashed var(--border-subtle);
+    }
+
+    .accordion-content-padding {
+      padding: 1.35rem 1.5rem 1.6rem;
+      font-family: var(--font-ui);
+    }
+
+    /* Accordion Tabs & Steps */
+    .breakdown-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.15rem;
+      margin-top: 0.75rem;
+    }
+
+    .step-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.15rem;
+    }
+
+    .step-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 0.45rem;
+    }
+
+    .step-number {
+      background: var(--accent);
+      color: #fff;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+    }
+
+    .step-card-text {
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .step-card-text code {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      background: var(--bg-tag);
+      padding: 0.15rem 0.35rem;
+      border-radius: 4px;
+      color: var(--text-main);
+    }
+
+    .math-intuition-callout {
+      margin-top: 1.15rem;
+      padding: 0.9rem 1.1rem;
+      background: var(--accent-soft);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--text-main);
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+
+    /* ==========================================================================
+       FLOATING SELECTION TOOLBAR
+       ========================================================================== */
+    #selection-floating-toolbar {
+      position: absolute;
+      z-index: 2000;
+      display: none;
+      opacity: 0;
+      transform: translateY(6px) scale(0.96);
+      transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    #selection-floating-toolbar.active {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .toolbar-bubble {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 5px;
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-toolbar);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      position: relative;
+    }
+
+    /* Little tooltip arrow pointing down */
+    .toolbar-arrow {
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid #0f172a;
+    }
+
+    .toolbar-arrow.arrow-top {
+      bottom: auto;
+      top: -6px;
+      border-top: none;
+      border-bottom: 6px solid #0f172a;
+    }
+
+    .toolbar-btn {
+      background: transparent;
+      border: none;
+      color: #f1f5f9;
+      font-family: var(--font-ui);
+      font-size: 0.81rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.15s ease, transform 0.1s ease, color 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .toolbar-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .toolbar-btn:active {
+      transform: translateY(1px);
+    }
+
+    .toolbar-btn.btn-intuition:hover {
+      background: rgba(245, 158, 11, 0.25);
+    }
+
+    .toolbar-btn.btn-eli5:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    .toolbar-btn.btn-math:hover {
+      background: rgba(99, 102, 241, 0.25);
+    }
+
+    /* ==========================================================================
+       PERSPECTIVE EXPLANATION MODAL / DRAWER
+       ========================================================================== */
+    .explanation-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 2500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .explanation-modal-backdrop.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .explanation-dialog {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-lg);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 620px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(12px) scale(0.98);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .explanation-modal-backdrop.show .explanation-dialog {
+      transform: translateY(0) scale(1);
+    }
+
+    .dialog-header {
+      padding: 1.25rem 1.5rem 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .selected-quote-box {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      font-family: var(--font-body);
+      font-style: italic;
+      background: var(--bg-subtle);
+      padding: 0.5rem 0.85rem;
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent);
+      max-height: 72px;
+      overflow-y: auto;
+      margin-top: 0.4rem;
+    }
+
+    .dialog-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .dialog-close-btn:hover {
+      background: var(--bg-subtle);
+      color: var(--text-main);
+    }
+
+    /* Modal Navigation Tabs */
+    .dialog-tabs {
+      display: flex;
+      background: var(--bg-subtle);
+      padding: 0.4rem 1.5rem;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: var(--font-ui);
+    }
+
+    .tab-button {
+      background: transparent;
+      border: none;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.83rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: all 0.18s ease;
+    }
+
+    .tab-button:hover {
+      color: var(--text-main);
+    }
+
+    .tab-button.active {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tab-button[data-tab="intuition"].active {
+      color: var(--amber-accent);
+    }
+    .tab-button[data-tab="eli5"].active {
+      color: var(--emerald-accent);
+    }
+    .tab-button[data-tab="math"].active {
+      color: var(--accent);
+    }
+
+    .dialog-content {
+      padding: 1.5rem;
+      overflow-y: auto;
+      font-family: var(--font-ui);
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: var(--text-main);
+    }
+
+    .dialog-content h4 {
+      font-size: 1.05rem;
+      margin-bottom: 0.6rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dialog-content p {
+      text-align: left;
+      margin-bottom: 1rem;
+      font-size: 0.92rem;
+    }
+
+    .dialog-content ul {
+      margin-left: 1.4rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .dialog-content li {
+      margin-bottom: 0.35rem;
+    }
+
+    .dialog-footer {
+      padding: 0.85rem 1.5rem;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-ui);
+      font-size: 0.78rem;
+      color: var(--text-light);
+    }
+
+    /* ==========================================================================
+       Responsive & Print Utilities
+       ========================================================================== */
+    @media (max-width: 640px) {
+      .paper-title {
+        font-size: 1.75rem;
+      }
+      .nav-inner {
+        padding: 0.6rem 1rem;
+      }
+      .toolbar-btn {
+        padding: 5px 8px;
+        font-size: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+  <!-- Progress Track -->
+  <div id="reading-progress-track">
+    <div id="reading-progress-bar"></div>
+  </div>
+
+  <!-- Sticky Reader Top Navigation -->
+  <header class="top-nav">
+    <div class="nav-inner">
+      <a href="#" class="paper-brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+          <path d="M6 6h10"></path>
+          <path d="M6 10h10"></path>
+        </svg>
+        <span>ScholarLens</span>
+        <span class="paper-brand-badge">Paper Reader</span>
+      </a>
+
+      <div class="nav-controls">
+        <!-- Expand/Collapse All Accordions -->
+        <button id="toggle-all-formulas-btn" class="btn-icon" title="Toggle all formula derivations">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="7 13 12 18 17 13"></polyline>
+            <polyline points="7 6 12 11 17 6"></polyline>
+          </svg>
+          <span id="toggle-all-label">Expand Formulas</span>
+        </button>
+
+        <!-- Theme Switcher -->
+        <div class="theme-select">
+          <button class="theme-btn active" data-set-theme="light">Light</button>
+          <button class="theme-btn" data-set-theme="sepia">Sepia</button>
+          <button class="theme-btn" data-set-theme="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    
+    <!-- Left Table of Contents Sticky Sidebar -->
+    <aside class="toc-sidebar">
+      <div class="toc-title">Contents</div>
+      <ul class="toc-list">
+        <li><a href="#abstract" class="toc-link active">Abstract</a></li>
+        <li><a href="#introduction" class="toc-link">1. Introduction</a></li>
+        <li><a href="#scaled-dot-product" class="toc-link">2. Scaled Dot-Product Attention</a></li>
+        <li><a href="#multi-head-attention" class="toc-link">3. Multi-Head Attention</a></li>
+        <li><a href="#positional-encoding" class="toc-link">4. Positional Encoding</a></li>
+        <li><a href="#layer-normalization" class="toc-link">5. Residuals & Normalization</a></li>
+        <li><a href="#conclusion" class="toc-link">6. Conclusion & References</a></li>
+      </ul>
+
+      <div style="margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
+        <div class="toc-title">Reader Tips</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
+          Highlight any phrase to trigger the floating AI perspective toolbar: 
+          <strong>💡 Intuition</strong>, <strong>🧒 ELI5</strong>, or <strong>📐 Math</strong>.
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Academic Reader -->
+    <main class="reader-article">
+
+      <!-- Paper Title & Metadata -->
+      <header class="paper-header">
+        <div class="paper-venue-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+          NeurIPS 2017 • Landmark Architecture Paper
+        </div>
+        <h1 class="paper-title">Attention Is All You Need</h1>
+        <div class="paper-authors">
+          Ashish Vaswani*, Noam Shazeer*, Niki Parmar*, Jakob Uszkoreit*, Llion Jones*, Aidan N. Gomez*, Łukasz Kaiser*, Illia Polosukhin*
+        </div>
+        <div class="paper-affiliations">
+          Google Brain, Google Research, University of Toronto
+        </div>
+      </header>
+
+      <!-- Interactive Highlight Banner -->
+      <section class="interactive-guide-card">
+        <div class="guide-title">
+          <span>✨</span>
+          <span>Interactive Reading Features Active</span>
+        </div>
+        <div class="guide-desc">
+          This paper reader features smooth accordion expansions for math derivations and an instant contextual selection toolbar.
+        </div>
+        <div class="guide-features">
+          <span class="feature-chip">📐 Smooth formula accordion breakdowns</span>
+          <span class="feature-chip">💡 Instant Intuition modal</span>
+          <span class="feature-chip">🧒 ELI5 simple analogies</span>
+          <span class="feature-chip">⌨️ Select any text anywhere</span>
+        </div>
+      </section>
+
+      <!-- Abstract Section -->
+      <section id="abstract" class="abstract-box">
+        <div class="abstract-label">Abstract</div>
+        <p class="abstract-text">
+          The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the <strong>Transformer</strong>, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles, by over 2 BLEU.
+        </p>
+      </section>
+
+      <!-- Section 1: Introduction -->
+      <section id="introduction">
+        <h2 class="section-heading">1. Introduction</h2>
+        <p>
+          Recurrent neural networks, particularly long short-term memory (<span class="highlight-term" data-term="LSTM">LSTM</span>) and gated recurrent (<span class="highlight-term" data-term="GRU">GRU</span>) neural networks, have been firmly established as state of the art approaches in sequence modeling and transduction problems such as language modeling and machine translation. Numerous efforts have since continued to push the boundaries of recurrent language models and encoder-decoder architectures.
+        </p>
+        <p>
+          Recurrent models typically factor computation along the symbol positions of the input and output sequences. Aligning the positions to steps in computation time, they generate a sequence of hidden states $h_t$, as a function of the previous hidden state $h_{t-1}$ and the input for position $t$. This inherently sequential nature precludes parallelization within training examples, which becomes critical at longer sequence lengths, as memory constraints limit batching across examples.
+        </p>
+        <p>
+          In this work we propose the <span class="highlight-term" data-term="Transformer">Transformer</span>, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output. The Transformer allows for significantly more parallelization and can reach a new state of the art in translation quality after being trained for as little as twelve hours on eight P100 GPUs.
+        </p>
+      </section>
+
+      <!-- Section 2: Scaled Dot-Product Attention -->
+      <section id="scaled-dot-product">
+        <h2 class="section-heading">2. Scaled Dot-Product Attention</h2>
+        <p>
+          An attention function can be described as mapping a query and a set of key-value pairs to an output, where the query, keys, values, and output are all vectors. The output is computed as a weighted sum of the values, where the weight assigned to each value is computed by a compatibility function of the query with the corresponding key.
+        </p>
+        <p>
+          We call our particular attention <strong>"Scaled Dot-Product Attention"</strong>. The input consists of queries and keys of dimension $d_k$, and values of dimension $d_v$. We compute the dot products of the query with all keys, divide each by $\sqrt{d_k}$, and apply a softmax function to obtain the weights on the values.
+        </p>
+
+        <!-- FORMULA ACCORDION 1: Scaled Dot Product Attention -->
+        <div class="formula-accordion-block" id="formula-scaled-dot-product">
+          <div class="formula-header">
+            <div class="formula-meta">
+              <span class="formula-tag">Core Equation</span>
+              <span class="formula-eq-number">Eq. (1)</span>
+            </div>
+            <div class="formula-latex-stage">
+              $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+            </div>
+          </div>
+
+          <!-- Accordion Toggle Button -->
+          <button class="formula-toggle-trigger" type="button" aria-expanded="false">
+            <span class="toggle-label-group">
+              <svg class="toggle-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              <span>Inspect Derivation & Scaling Factor Rationale</span>
+            </span>
+            <span class="open-state-indicator">Click to Expand</span>
+          </button>
+
+          <!-- Smooth CSS Animated Body (grid-template-rows: 0fr -> 1fr) -->
+          <div class="formula-accordion-body">
+            <div class="formula-accordion-inner">
+              <div class="accordion-content-padding">
+                <div class="breakdown-grid">
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">1</span>
+                      <span>Matrix Multiplication ($QK^T$)</span>
+                    </div>
+                    <div class="step-card-text">
+                      Computes the pairwise compatibility scores between all queries and keys. For a sequence of length $n$, multiplying $Q \in \mathbb{R}^{n \times d_k}$ with $K^T \in \mathbb{R}^{d_k \times n}$ yields an $n \times n$ attention matrix measuring mutual token resonance.
+                    </div>
+                  </div>
+
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">2</span>
+                      <span>Variance Scaling ($\frac{1}{\sqrt{d_k}}$)</span>
+                    </div>
+                    <div class="step-card-text">
+                      If query and key components are independent random variables with mean $0$ and variance $1$, their dot product has mean $0$ and variance $d_k$. For large $d_k$, the dot products grow exceedingly large in magnitude, pushing softmax into regions with vanishing gradients! Scaling by $\sqrt{d_k}$ restores unit variance.
+                    </div>
+                  </div>
+
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">3</span>
+                      <span>Softmax Normalization</span>
+                    </div>
+                    <div class="step-card-text">
+                      Applies $\text{softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}$ row-wise to convert unbounded raw similarity logits into a rigorous probability distribution that sums to $1.0$.
+                    </div>
+                  </div>
+
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">4</span>
+                      <span>Value Aggregation ($\times V$)</span>
+                    </div>
+                    <div class="step-card-text">
+                      Multiplies the attention distribution matrix by $V \in \mathbb{R}^{n \times d_v}$. Each output row is a context-weighted convex combination of value representations across the entire sequence.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="math-intuition-callout">
+                  <span style="font-size: 1.2rem;">💡</span>
+                  <div>
+                    <strong>Why Dot-Product over Additive Attention?</strong> While additive attention yields comparable performance, dot-product attention can be implemented using highly optimized BLAS matrix multiplication routines, making it drastically faster and more space-efficient in hardware.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p>
+          In practice, we compute the attention function on a set of queries simultaneously, packed together into a matrix $Q$. The keys and values are also packed into matrices $K$ and $V$.
+        </p>
+      </section>
+
+      <!-- Section 3: Multi-Head Attention -->
+      <section id="multi-head-attention">
+        <h2 class="section-heading">3. Multi-Head Attention</h2>
+        <p>
+          Instead of performing a single attention function with $d_{model}$-dimensional keys, values and queries, we found it beneficial to linearly project the queries, keys and values $h$ times with different, learned linear projections to $d_k$, $d_k$ and $d_v$ dimensions, respectively.
+        </p>
+        <p>
+          Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions. With a single attention head, averaging inhibits this.
+        </p>
+
+        <!-- FORMULA ACCORDION 2: Multi-Head Attention -->
+        <div class="formula-accordion-block" id="formula-multi-head">
+          <div class="formula-header">
+            <div class="formula-meta">
+              <span class="formula-tag">Subspace Projections</span>
+              <span class="formula-eq-number">Eq. (2)</span>
+            </div>
+            <div class="formula-latex-stage">
+              $$\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)W^O$$
+              $$\text{where } \text{head}_i = \text{Attention}(QW_i^Q, KW_i^K, VW_i^V)$$
+            </div>
+          </div>
+
+          <button class="formula-toggle-trigger" type="button" aria-expanded="false">
+            <span class="toggle-label-group">
+              <svg class="toggle-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              <span>Examine Projection Dimensions & Head Concatenation</span>
+            </span>
+            <span class="open-state-indicator">Click to Expand</span>
+          </button>
+
+          <div class="formula-accordion-body">
+            <div class="formula-accordion-inner">
+              <div class="accordion-content-padding">
+                <div class="breakdown-grid">
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">1</span>
+                      <span>Parameter Projection Matrices</span>
+                    </div>
+                    <div class="step-card-text">
+                      The projections are parameter matrices:
+                      $W_i^Q \in \mathbb{R}^{d_{model} \times d_k}$, 
+                      $W_i^K \in \mathbb{R}^{d_{model} \times d_k}$, 
+                      $W_i^V \in \mathbb{R}^{d_{model} \times d_v}$, and 
+                      $W^O \in \mathbb{R}^{hd_v \times d_{model}}$.
+                    </div>
+                  </div>
+
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">2</span>
+                      <span>Hyperparameter Choices</span>
+                    </div>
+                    <div class="step-card-text">
+                      In the canonical Transformer: $h = 8$ parallel attention layers (heads). For each head, $d_k = d_v = d_{model}/h = 512 / 8 = 64$. Due to the reduced dimension of each head, total compute is similar to single-head attention with full dimensionality.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="math-intuition-callout">
+                  <span style="font-size: 1.2rem;">🧠</span>
+                  <div>
+                    <strong>Subspace Diversity:</strong> One head can focus on syntactic dependencies (e.g. subject-verb matching), another on anaphora resolution (e.g. pronouns to antecedents), and another on punctuation or semantic sentiment.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Positional Encoding -->
+      <section id="positional-encoding">
+        <h2 class="section-heading">4. Positional Encoding</h2>
+        <p>
+          Since our model contains no recurrence and no convolution, in order for the model to make use of the order of the sequence, we must inject some information about the relative or absolute position of the tokens in the sequence. To this end, we add <strong>"positional encodings"</strong> to the input embeddings at the bottoms of the encoder and decoder stacks.
+        </p>
+
+        <!-- FORMULA ACCORDION 3: Positional Encoding -->
+        <div class="formula-accordion-block" id="formula-positional-encoding">
+          <div class="formula-header">
+            <div class="formula-meta">
+              <span class="formula-tag">Sinusoidal Signal</span>
+              <span class="formula-eq-number">Eq. (3) & (4)</span>
+            </div>
+            <div class="formula-latex-stage">
+              $$PE_{(pos, 2i)} = \sin\left(\frac{pos}{10000^{2i/d_{model}}}\right)$$
+              $$PE_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i/d_{model}}}\right)$$
+            </div>
+          </div>
+
+          <button class="formula-toggle-trigger" type="button" aria-expanded="false">
+            <span class="toggle-label-group">
+              <svg class="toggle-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              <span>Why Sinusoids? Trigonometric Shift Derivation</span>
+            </span>
+            <span class="open-state-indicator">Click to Expand</span>
+          </button>
+
+          <div class="formula-accordion-body">
+            <div class="formula-accordion-inner">
+              <div class="accordion-content-padding">
+                <div class="breakdown-grid">
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">1</span>
+                      <span>Wavelength Spectrum</span>
+                    </div>
+                    <div class="step-card-text">
+                      The wavelengths form a geometric progression from $2\pi$ to $10000 \cdot 2\pi$. The lower dimensions oscillate rapidly (capturing local relative distances), while higher dimensions oscillate slowly (capturing global macro structure).
+                    </div>
+                  </div>
+
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">2</span>
+                      <span>Linear Relative Shift Property</span>
+                    </div>
+                    <div class="step-card-text">
+                      For any fixed offset $k$, $PE_{pos+k}$ can be represented as a linear function of $PE_{pos}$ via angle sum identities:
+                      $\cos(\alpha + \beta) = \cos\alpha\cos\beta - \sin\alpha\sin\beta$. This enables the self-attention layer to easily learn to attend by relative positions!
+                    </div>
+                  </div>
+                </div>
+
+                <div class="math-intuition-callout">
+                  <span style="font-size: 1.2rem;">📐</span>
+                  <div>
+                    <strong>Extrapolation to Unseen Lengths:</strong> Unlike learned positional embeddings which fail completely when encountering sentences longer than seen during training, sinusoidal functions extrapolate naturally to arbitrary sequence lengths.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: Residuals & Layer Normalization -->
+      <section id="layer-normalization">
+        <h2 class="section-heading">5. Residual Connections & Layer Normalization</h2>
+        <p>
+          Each sub-layer (multi-head attention or feed-forward network) in each encoder and decoder layer is wrapped with a residual connection, followed by layer normalization. That is, the output of each sub-layer is:
+        </p>
+
+        <!-- FORMULA ACCORDION 4: LayerNorm -->
+        <div class="formula-accordion-block" id="formula-layernorm">
+          <div class="formula-header">
+            <div class="formula-meta">
+              <span class="formula-tag">Sub-layer Wrapper</span>
+              <span class="formula-eq-number">Eq. (5)</span>
+            </div>
+            <div class="formula-latex-stage">
+              $$\text{Output} = \text{LayerNorm}(x + \text{SubLayer}(x))$$
+              $$\text{where } \text{LayerNorm}(z) = \frac{z - \mu}{\sqrt{\sigma^2 + \epsilon}} \odot \gamma + \beta$$
+            </div>
+          </div>
+
+          <button class="formula-toggle-trigger" type="button" aria-expanded="false">
+            <span class="toggle-label-group">
+              <svg class="toggle-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              <span>Explore Gradient Highway & Covariate Shift Stabilization</span>
+            </span>
+            <span class="open-state-indicator">Click to Expand</span>
+          </button>
+
+          <div class="formula-accordion-body">
+            <div class="formula-accordion-inner">
+              <div class="accordion-content-padding">
+                <div class="breakdown-grid">
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">1</span>
+                      <span>Residual Gradient Highway</span>
+                    </div>
+                    <div class="step-card-text">
+                      The skip-connection ($x + \text{SubLayer}(x)$) ensures the gradient operator $\frac{\partial \mathcal{L}}{\partial x}$ contains an identity term $+1$, preventing vanishing gradients even when stacking dozens of transformer layers.
+                    </div>
+                  </div>
+
+                  <div class="step-card">
+                    <div class="step-card-header">
+                      <span class="step-number">2</span>
+                      <span>LayerNorm vs BatchNorm</span>
+                    </div>
+                    <div class="step-card-text">
+                      Batch normalization computes statistics across batch examples (which struggles with variable sequence lengths). Layer normalization normalizes across the feature dimension for each token independently, making it invariant to batch size.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 6: Conclusion -->
+      <section id="conclusion">
+        <h2 class="section-heading">6. Conclusion</h2>
+        <p>
+          In this work, we presented the Transformer, the first sequence transduction model based entirely on attention, replacing the recurrent layers most commonly used in encoder-decoder architectures with multi-headed self-attention.
+        </p>
+        <p>
+          For translation tasks, the Transformer can be trained significantly faster than architectures based on recurrent or convolutional layers. On both WMT 2014 English-to-German and WMT 2014 English-to-French translation tasks, we achieve a new state of the art.
+        </p>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       FLOATING SELECTION TOOLBAR
+       With three requested buttons: '💡 Intuition', '🧒 ELI5', and '📐 Math'
+       ========================================================================== -->
+  <div id="selection-floating-toolbar" role="toolbar" aria-label="Text Selection Explainer">
+    <div class="toolbar-bubble">
+      <button class="toolbar-btn btn-intuition" data-perspective="intuition" title="Core intuition and mental model">
+        <span>💡</span>
+        <span>Intuition</span>
+      </button>
+
+      <button class="toolbar-btn btn-eli5" data-perspective="eli5" title="Explain Like I'm 5 (plain English analogy)">
+        <span>🧒</span>
+        <span>ELI5</span>
+      </button>
+
+      <button class="toolbar-btn btn-math" data-perspective="math" title="Rigorous mathematical and formal breakdown">
+        <span>📐</span>
+        <span>Math</span>
+      </button>
+
+      <!-- Pointer Arrow -->
+      <div class="toolbar-arrow" id="toolbar-arrow"></div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       EXPLANATION DIALOG MODAL / DRAWER
+       ========================================================================== -->
+  <div class="explanation-modal-backdrop" id="explanation-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="explanation-dialog">
+      <div class="dialog-header">
+        <div>
+          <h3 id="modal-title" style="font-size: 1.15rem; font-family: var(--font-ui); font-weight: 700; color: var(--text-main);">
+            Concept Deep Dive
+          </h3>
+          <div class="selected-quote-box" id="modal-quote">
+            "Selected text snippet..."
+          </div>
+        </div>
+        <button class="dialog-close-btn" id="modal-close-btn" aria-label="Close dialog">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs for the 3 perspectives -->
+      <div class="dialog-tabs">
+        <button class="tab-button" data-tab="intuition">
+          <span>💡</span>
+          <span>Intuition</span>
+        </button>
+        <button class="tab-button" data-tab="eli5">
+          <span>🧒</span>
+          <span>ELI5</span>
+        </button>
+        <button class="tab-button" data-tab="math">
+          <span>📐</span>
+          <span>Math</span>
+        </button>
+      </div>
+
+      <div class="dialog-content" id="modal-body">
+        <!-- Content will be injected dynamically based on the selected tab & highlighted text -->
+      </div>
+
+      <div class="dialog-footer">
+        <span>Academic Lens Explainer • Press <kbd style="background: var(--bg-surface); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border-medium);">Esc</kbd> to close</span>
+        <button class="btn-icon" id="copy-explanation-btn" style="padding: 0.25rem 0.6rem; font-size: 0.76rem;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="copy-btn-text">Copy Note</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       JAVASCRIPT APPLICATION LOGIC
+       ========================================================================== -->
+  <script>
+    /* ==========================================================================
+       1. KaTeX Math Rendering Initializer
+       ========================================================================== */
+    function initMathRendering() {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Run math rendering in case KaTeX finished loading
+      initMathRendering();
+
+      /* ==========================================================================
+         2. Formula Accordion Interaction (Smooth CSS Grid Transition)
+         ========================================================================== */
+      const accordions = document.querySelectorAll('.formula-accordion-block');
+      const toggleAllBtn = document.getElementById('toggle-all-formulas-btn');
+      const toggleAllLabel = document.getElementById('toggle-all-label');
+
+      accordions.forEach(accordion => {
+        const trigger = accordion.querySelector('.formula-toggle-trigger');
+        const indicator = accordion.querySelector('.open-state-indicator');
+
+        trigger.addEventListener('click', () => {
+          const isOpen = accordion.classList.toggle('open');
+          trigger.setAttribute('aria-expanded', isOpen);
+          if (indicator) {
+            indicator.textContent = isOpen ? 'Click to Collapse' : 'Click to Expand';
+          }
+          updateToggleAllButtonState();
+        });
+      });
+
+      function updateToggleAllButtonState() {
+        const allOpen = Array.from(accordions).every(a => a.classList.contains('open'));
+        if (toggleAllLabel) {
+          toggleAllLabel.textContent = allOpen ? 'Collapse Formulas' : 'Expand Formulas';
+        }
+      }
+
+      if (toggleAllBtn) {
+        toggleAllBtn.addEventListener('click', () => {
+          const anyClosed = Array.from(accordions).some(a => !a.classList.contains('open'));
+          accordions.forEach(accordion => {
+            const trigger = accordion.querySelector('.formula-toggle-trigger');
+            const indicator = accordion.querySelector('.open-state-indicator');
+            if (anyClosed) {
+              accordion.classList.add('open');
+              if (trigger) trigger.setAttribute('aria-expanded', 'true');
+              if (indicator) indicator.textContent = 'Click to Collapse';
+            } else {
+              accordion.classList.remove('open');
+              if (trigger) trigger.setAttribute('aria-expanded', 'false');
+              if (indicator) indicator.textContent = 'Click to Expand';
+            }
+          });
+          updateToggleAllButtonState();
+        });
+      }
+
+      /* ==========================================================================
+         3. Floating Selection Toolbar Logic
+         ========================================================================== */
+      const floatingToolbar = document.getElementById('selection-floating-toolbar');
+      const toolbarArrow = document.getElementById('toolbar-arrow');
+      let currentSelectionText = '';
+
+      // Listen for text selections on the page
+      document.addEventListener('selectionchange', handleSelection);
+      document.addEventListener('mouseup', handleSelection);
+      document.addEventListener('keyup', handleSelection);
+
+      function handleSelection() {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+          hideFloatingToolbar();
+          return;
+        }
+
+        const text = selection.toString().trim();
+        if (text.length < 2) {
+          hideFloatingToolbar();
+          return;
+        }
+
+        // Verify selection is within the reader area
+        const range = selection.getRangeAt(0);
+        const readerElement = document.querySelector('.reader-article');
+        if (!readerElement || !readerElement.contains(range.commonAncestorContainer)) {
+          hideFloatingToolbar();
+          return;
+        }
+
+        currentSelectionText = text;
+        positionFloatingToolbar(range);
+      }
+
+      function positionFloatingToolbar(range) {
+        const rect = range.getBoundingClientRect();
+        if (!rect || (rect.width === 0 && rect.height === 0)) {
+          hideFloatingToolbar();
+          return;
+        }
+
+        floatingToolbar.classList.add('active');
+        const toolbarRect = floatingToolbar.getBoundingClientRect();
+
+        // Calculate center position horizontally
+        let left = rect.left + (rect.width / 2) - (toolbarRect.width / 2);
+        // Constrain horizontally within viewport
+        const padding = 12;
+        left = Math.max(padding, Math.min(left, window.innerWidth - toolbarRect.width - padding));
+
+        // Place above selection by default
+        let top = rect.top - toolbarRect.height - 10;
+        let arrowIsTop = false;
+
+        // If clipped at top of viewport, position below selection instead
+        if (top < 10) {
+          top = rect.bottom + 10;
+          arrowIsTop = true;
+        }
+
+        // Account for scroll offset
+        floatingToolbar.style.left = `${left + window.scrollX}px`;
+        floatingToolbar.style.top = `${top + window.scrollY}px`;
+
+        if (arrowIsTop) {
+          toolbarArrow.classList.add('arrow-top');
+        } else {
+          toolbarArrow.classList.remove('arrow-top');
+        }
+      }
+
+      function hideFloatingToolbar() {
+        if (floatingToolbar.classList.contains('active')) {
+          floatingToolbar.classList.remove('active');
+        }
+      }
+
+      // Hide toolbar when clicking outside
+      document.addEventListener('mousedown', (e) => {
+        if (!floatingToolbar.contains(e.target)) {
+          // If clicked outside, let selection logic handle or close
+          setTimeout(() => {
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed) hideFloatingToolbar();
+          }, 100);
+        }
+      });
+
+      // Window resize / scroll updates
+      window.addEventListener('scroll', () => {
+        updateReadingProgressBar();
+        updateActiveTocLink();
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && floatingToolbar.classList.contains('active')) {
+          const range = sel.getRangeAt(0);
+          positionFloatingToolbar(range);
+        }
+      }, { passive: true });
+
+      /* ==========================================================================
+         4. Explanation Knowledge Base & Generative Resolver
+         ========================================================================== */
+      const knowledgeBase = {
+        attention: {
+          title: "Attention Mechanism",
+          intuition: {
+            headline: "Dynamic Relevance Querying",
+            body: "Instead of compressing an entire sequence into a single static bottleneck vector (like traditional RNNs do), attention allows each token to create a direct conversational bridge to every other token. When translating the word 'bank', the model looks at words like 'river' or 'money' nearby to decide which meaning applies."
+          },
+          eli5: {
+            headline: "The Smart Spotlight in a Room",
+            body: "Imagine you're reading a mystery book with 10 characters in a room. When someone says 'he dropped the knife', you don't look at everyone equally. Your eyes instantly shine a flashlight directly on whoever was holding the knife! That spotlight is attention."
+          },
+          math: {
+            headline: "Weighted Convex Combination of Value Vectors",
+            body: "Given queries $Q \\in \\mathbb{R}^{n \\times d_k}$, keys $K \\in \\mathbb{R}^{m \\times d_k}$, and values $V \\in \\mathbb{R}^{m \\times d_v}$:\n$$\\text{Attn}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V$$\nWhere the softmax computes a stochastic matrix $A \\in [0, 1]^{n \\times m}$ with $\\sum_{j=1}^m A_{ij} = 1$, representing a simplex distribution over value embeddings."
+          }
+        },
+        scaled: {
+          title: "Variance Scaling Factor (1 / √d_k)",
+          intuition: {
+            headline: "Stopping the Softmax Saturation Trap",
+            body: "As vector dimensions increase, the sum of their element-wise products grows larger and larger. Without scaling, dot products explode to huge numbers (+50 or -50), pushing the softmax function to extremes where gradients become virtually zero, causing training to freeze."
+          },
+          eli5: {
+            headline: "The Volume Knob for Shouting",
+            body: "If 100 people are whispering, you can hear details. If 512 people all scream into a microphone at the same time, the speaker blows out and just emits a loud buzz! Dividing by $\\sqrt{d_k}$ turns down the master volume knob so the loudest voice doesn't drown everyone else out."
+          },
+          math: {
+            headline: "Variance of Independent Random Variables",
+            body: "Assume $q_i, k_i \\sim \\mathcal{N}(0, 1)$ are i.i.d. The inner product is $q \\cdot k = \\sum_{i=1}^{d_k} q_i k_i$. Its expectation is $\\mathbb{E}[q \\cdot k] = 0$, and variance is $\\text{Var}(q \\cdot k) = \\sum_{i=1}^{d_k} \\text{Var}(q_i k_i) = d_k$. Dividing by $\\sqrt{d_k}$ scales variance back to $\\text{Var}\\left(\\frac{q \\cdot k}{\\sqrt{d_k}}\\right) = 1$, preserving healthy gradient flow."
+          }
+        },
+        multihead: {
+          title: "Multi-Head Attention",
+          intuition: {
+            headline: "Viewing Through Multiple Lenses Concurrently",
+            body: "A single sentence contains many concurrent linguistic relationships: grammar, pronoun agreement, tense, and topical context. A single attention head would have to average all these relationships together. Multiple heads let the model dedicate specialized sub-networks to each specific linguistic relationship."
+          },
+          eli5: {
+            headline: "A Team of 8 Different Experts",
+            body: "Instead of asking one detective to watch everyone, you hire 8 detectives. Detective 1 watches grammar, Detective 2 checks who 'he' refers to, Detective 3 watches the action verbs, and Detective 4 checks punctuation. Then they all combine their notes!"
+          },
+          math: {
+            headline: "Linear Subspace Projections and Concatenation",
+            body: "For $h$ heads with projections $W_i^Q, W_i^K \\in \\mathbb{R}^{d_{model} \\times d_k}$ and $W_i^V \\in \\mathbb{R}^{d_{model} \\times d_v}$:\n$$\\text{head}_i = \\text{Attention}(QW_i^Q, KW_i^K, VW_i^V)$$\n$$\\text{MultiHead}(Q, K, V) = [\\text{head}_1 \\mathbin{\\Vert} \\dots \\mathbin{\\Vert} \\text{head}_h] W^O$$\nwhere $W^O \\in \\mathbb{R}^{h d_v \\times d_{model}}$ fuses the concatenated heads back into model space."
+          }
+        },
+        positional: {
+          title: "Positional Encoding",
+          intuition: {
+            headline: "Providing Spatial Awareness to a Bag of Words",
+            body: "Because dot-product attention operations are permutation invariant (ordering doesn't change the math), the Transformer has no inherent sense of word order! Adding distinct sinusoidal waves of varying frequencies bakes order directly into each word vector."
+          },
+          eli5: {
+            headline: "Numbering the Pages of a Shuffled Book",
+            body: "If you throw the pages of a book on the floor, you can't tell which page came first unless there are page numbers printed on them. Positional encoding writes a unique mathematical stamp on each word so the model knows who is 1st, 2nd, and 100th!"
+          },
+          math: {
+            headline: "Harmonic Coordinate Embeddings",
+            body: "Functions are given by:\n$$PE_{(pos, 2i)} = \\sin\\left(pos / 10000^{2i/d}\\right), \\quad PE_{(pos, 2i+1)} = \\cos\\left(pos / 10000^{2i/d}\\right)$$\nBy Euler's formula and rotation matrices, for any fixed offset $k$, there exists an orthogonal matrix $M_k$ such that $PE_{pos+k} = M_k PE_{pos}$, enabling linear attention relative offsets."
+          }
+        },
+        layernorm: {
+          title: "Layer Normalization & Residual Connections",
+          intuition: {
+            headline: "Preserving Gradient Signal Across Deep Networks",
+            body: "Deep neural networks suffer from degradation: as signals pass through many transformations, activations either blow up or fade away. Residual connections add an unimpeded express lane for gradients, while LayerNorm keeps the magnitude of signals well-behaved."
+          },
+          eli5: {
+            headline: "An Express Highway + Volume Leveler",
+            body: "Imagine playing a game of Telephone with 50 people. By person 30, the message is completely distorted! A residual connection lets person 1 whisper directly into person 50's ear as a reference, while LayerNorm ensures no one screams too loud."
+          },
+          math: {
+            headline: "Affine-Transformed Standardized Normalization",
+            body: "Given vector $x \\in \\mathbb{R}^d$, compute sample mean $\\mu = \\frac{1}{d}\\sum_{i=1}^d x_i$ and variance $\\sigma^2 = \\frac{1}{d}\\sum_{i=1}^d (x_i - \\mu)^2$:\n$$\\text{LN}(x) = \\frac{x - \\mu}{\\sqrt{\\sigma^2 + \\epsilon}} \\odot \\gamma + \\beta$$\nwith learnable scale $\\gamma$ and bias $\\beta$ parameters."
+          }
+        }
+      };
+
+      // Heuristic resolver matching user selection to concept or generating dynamic explanation
+      function resolveExplanation(text) {
+        const lower = text.toLowerCase();
+        
+        if (lower.includes('scale') || lower.includes('root') || lower.includes('sqrt') || lower.includes('d_k')) {
+          return knowledgeBase.scaled;
+        }
+        if (lower.includes('multi-head') || lower.includes('head') || lower.includes('subspace')) {
+          return knowledgeBase.multihead;
+        }
+        if (lower.includes('position') || lower.includes('sin') || lower.includes('cos') || lower.includes('encoding')) {
+          return knowledgeBase.positional;
+        }
+        if (lower.includes('norm') || lower.includes('residual') || lower.includes('sublayer')) {
+          return knowledgeBase.layernorm;
+        }
+        if (lower.includes('attention') || lower.includes('softmax') || lower.includes('query') || lower.includes('key') || lower.includes('value')) {
+          return knowledgeBase.attention;
+        }
+
+        // Generic intelligent fallback for arbitrary selected text
+        const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
+        return {
+          title: `Analysis: "${snippet}"`,
+          intuition: {
+            headline: "Core Conceptual Role in Architecture",
+            body: `In the context of the Transformer architecture, "${text}" represents a foundational mechanism that eliminates recurrent sequential bottlenecks. It operates synchronously across all token embeddings, preserving bidirectional context without state degradation.`
+          },
+          eli5: {
+            headline: "Simple Analogy",
+            body: `Think of "${text}" like a smart organizer at a busy convention. Instead of passing notes one by one down a line of 100 people, everyone has a direct line to instantly share the information they need without waiting.`
+          },
+          math: {
+            headline: "Formal Mathematical Mechanics",
+            body: `Analyzing the component in vector space:\n$$\\mathcal{F}(\\mathbf{x}) = \\mathbf{W} \\cdot \\mathbf{x} + \\mathbf{b}$$\nwhere features interact through non-linear projections, projecting high-dimensional token representations into structured metric spaces where semantic distance reflects contextual relevance.`
+          }
+        };
+      }
+
+      /* ==========================================================================
+         5. Perspective Modal Controller
+         ========================================================================== */
+      const modal = document.getElementById('explanation-modal');
+      const modalCloseBtn = document.getElementById('modal-close-btn');
+      const modalTitle = document.getElementById('modal-title');
+      const modalQuote = document.getElementById('modal-quote');
+      const modalBody = document.getElementById('modal-body');
+      const tabButtons = document.querySelectorAll('.dialog-tabs .tab-button');
+      const copyBtn = document.getElementById('copy-explanation-btn');
+      const copyBtnText = document.getElementById('copy-btn-text');
+
+      let currentExplanationData = null;
+      let activePerspective = 'intuition';
+
+      // Attach click events to Floating Toolbar buttons
+      document.querySelectorAll('.toolbar-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const perspective = btn.getAttribute('data-perspective');
+          openExplanationModal(currentSelectionText, perspective);
+          hideFloatingToolbar();
+        });
+      });
+
+      // Allow clicking highlighted terms in text
+      document.querySelectorAll('.highlight-term').forEach(term => {
+        term.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const termText = term.innerText;
+          openExplanationModal(termText, 'intuition');
+        });
+      });
+
+      function openExplanationModal(selectedText, initialTab = 'intuition') {
+        currentExplanationData = resolveExplanation(selectedText);
+        activePerspective = initialTab;
+
+        modalTitle.textContent = currentExplanationData.title;
+        modalQuote.textContent = `"${selectedText}"`;
+
+        // Update active tab button
+        tabButtons.forEach(btn => {
+          if (btn.getAttribute('data-tab') === initialTab) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+
+        renderPerspectiveContent(initialTab);
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden'; // prevent background scrolling
+      }
+
+      function renderPerspectiveContent(perspective) {
+        if (!currentExplanationData) return;
+        const data = currentExplanationData[perspective];
+
+        const icons = {
+          intuition: '💡',
+          eli5: '🧒',
+          math: '📐'
+        };
+
+        const titles = {
+          intuition: 'Conceptual Intuition',
+          eli5: 'Explain Like I\'m 5',
+          math: 'Formal Mathematical Formulation'
+        };
+
+        modalBody.innerHTML = `
+          <h4>
+            <span>${icons[perspective]}</span>
+            <span>${data.headline}</span>
+          </h4>
+          <p>${data.body}</p>
+        `;
+
+        // Render KaTeX in newly inserted modal content
+        if (window.renderMathInElement) {
+          renderMathInElement(modalBody, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+          });
+        }
+      }
+
+      // Tab switcher inside modal
+      tabButtons.forEach(tabBtn => {
+        tabBtn.addEventListener('click', () => {
+          tabButtons.forEach(b => b.classList.remove('active'));
+          tabBtn.classList.add('active');
+          const tab = tabBtn.getAttribute('data-tab');
+          activePerspective = tab;
+          renderPerspectiveContent(tab);
+        });
+      });
+
+      // Close modal functions
+      function closeModal() {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      modalCloseBtn.addEventListener('click', closeModal);
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('show')) {
+          closeModal();
+        }
+      });
+
+      // Copy Explanation Note
+      copyBtn.addEventListener('click', () => {
+        if (!currentExplanationData) return;
+        const pData = currentExplanationData[activePerspective];
+        const textToCopy = `[${currentExplanationData.title} - ${activePerspective.toUpperCase()}]\n${pData.headline}\n${pData.body}`;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          copyBtnText.textContent = 'Copied!';
+          setTimeout(() => {
+            copyBtnText.textContent = 'Copy Note';
+          }, 1800);
+        });
+      });
+
+      /* ==========================================================================
+         6. Theme Switcher (Light / Sepia / Dark)
+         ========================================================================== */
+      const themeBtns = document.querySelectorAll('.theme-btn');
+      themeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          themeBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const theme = btn.getAttribute('data-set-theme');
+          document.body.setAttribute('data-theme', theme);
+        });
+      });
+
+      /* ==========================================================================
+         7. Reading Progress Bar & Table of Contents Tracker
+         ========================================================================== */
+      const progressBar = document.getElementById('reading-progress-bar');
+      const sections = document.querySelectorAll('section[id], header[id]');
+      const tocLinks = document.querySelectorAll('.toc-link');
+
+      function updateReadingProgressBar() {
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+        progressBar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+      }
+
+      function updateActiveTocLink() {
+        let currentId = '';
+        const scrollPosition = window.scrollY + 120;
+
+        sections.forEach(section => {
+          const sectionTop = section.offsetTop;
+          if (scrollPosition >= sectionTop) {
+            currentId = section.getAttribute('id');
+          }
+        });
+
+        if (currentId) {
+          tocLinks.forEach(link => {
+            if (link.getAttribute('href') === `#${currentId}`) {
+              link.classList.add('active');
+            } else {
+              link.classList.remove('active');
+            }
+          });
+        }
+      }
+    });
+  </script>
+</body>
+</html>

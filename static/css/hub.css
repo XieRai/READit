@@ -1,0 +1,80 @@
+/* ===================================================================== */
+/* READit Document Hub Custom Stylesheet (hub.css)                       */
+/* ===================================================================== */
+
+body {
+    background-color: #202020;
+    color: #FFFFFF;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #1B1B1B;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* Collapsible Account Drawer Animation */
+.hub-account-drawer {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+}
+.hub-account-drawer.open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+.hub-account-drawer-inner {
+    overflow: hidden;
+}
+
+/* Crisp Academic PDF Paper Sheet */
+.academic-paper-sheet {
+    background-color: #FFFFFF;
+    color: #111827;
+    box-shadow: 
+        0 24px 60px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Whole-Sentence Hover & Click Selection inside Smart Reader */
+.readit-sentence {
+    border-radius: 4px;
+    padding: 2px 3px;
+    margin: 0 -3px;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+    cursor: pointer;
+}
+.readit-sentence:hover {
+    background-color: rgba(118, 184, 67, 0.22);
+    box-shadow: 0 0 0 1px rgba(118, 184, 67, 0.38);
+}
+.readit-sentence.active-sentence {
+    background-color: #FEF08A;
+    border-bottom: 2px solid #CA8A04;
+    color: #000000;
+}
+
+/* Upload Card Hover / Dragover Border */
+.upload-card-interactive {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.upload-card-interactive:hover,
+.upload-card-interactive.drag-active {
+    border-color: #9333EA;
+    box-shadow: 0 0 0 1px rgba(147, 51, 234, 0.35);
+    background-color: #262626;
+}
