@@ -806,32 +806,251 @@ function togglePaperSwitcherDrawer(openState) {
     }
 }
 
+// =====================================================================
+// DRAWER PAPERS LIST (MOBILE VIEW WITH DRAG & DROP REORDERING)
+// =====================================================================
+let drawerTouchDragId = null;
+let drawerTouchTargetId = null;
+let drawerTouchInsertBefore = false;
+let drawerDraggedTabId = null;
+
 function renderDrawerPapersList() {
     const container = document.getElementById('drawer-papers-list');
     if (!container) return;
 
-    container.innerHTML = openTabs.map((tab) => {
+    container.innerHTML = openTabs.map((tab, idx) => {
         const isActive = tab.id === activeTabId;
         return `
-            <div class="flex items-center justify-between p-2.5 rounded-xl ${isActive ? 'bg-white/[0.12] border-readitGreen/60' : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'} border min-h-[48px] transition-all">
+            <div id="drawer-paper-item-${tab.id}"
+                 data-tab-id="${tab.id}"
+                 data-tab-index="${idx}"
+                 draggable="true"
+                 ondragstart="handleDrawerDragStart(event, '${tab.id}')"
+                 ondragover="handleDrawerDragOver(event, '${tab.id}')"
+                 ondragenter="handleDrawerDragEnter(event, '${tab.id}')"
+                 ondragleave="handleDrawerDragLeave(event, '${tab.id}')"
+                 ondrop="handleDrawerDrop(event, '${tab.id}')"
+                 ondragend="handleDrawerDragEnd(event)"
+                 class="drawer-paper-item flex items-center justify-between p-2 rounded-xl ${isActive ? 'bg-white/[0.12] border-readitGreen/60' : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'} border min-h-[48px] transition-all select-none relative">
+                
+                <!-- Touch & Mouse Drag Handle -->
+                <div class="drawer-drag-handle p-2 min-w-[36px] min-h-[44px] flex items-center justify-center text-white/40 hover:text-white/80 active:text-readitGreen cursor-grab active:cursor-grabbing touch-none shrink-0" 
+                     title="Touch and drag to reorder index">
+                    <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <circle cx="9" cy="6" r="1.5" fill="currentColor"></circle>
+                        <circle cx="15" cy="6" r="1.5" fill="currentColor"></circle>
+                        <circle cx="9" cy="12" r="1.5" fill="currentColor"></circle>
+                        <circle cx="15" cy="12" r="1.5" fill="currentColor"></circle>
+                        <circle cx="9" cy="18" r="1.5" fill="currentColor"></circle>
+                        <circle cx="15" cy="18" r="1.5" fill="currentColor"></circle>
+                    </svg>
+                </div>
+
+                <!-- Paper Selection Button -->
                 <button onclick="switchReaderTab('${tab.id}'); togglePaperSwitcherDrawer(false);" 
-                        class="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[44px] focus:outline-none touch-manipulation">
+                        class="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[44px] focus:outline-none touch-manipulation py-1">
                     <span class="w-2.5 h-2.5 rounded-full ${isActive ? 'bg-readitGreen shadow-[0_0_8px_rgba(118,184,67,0.8)]' : 'bg-white/30'} shrink-0"></span>
-                    <div class="truncate">
-                        <div class="text-xs font-semibold ${isActive ? 'text-white' : 'text-white/80'} truncate">${tab.title}</div>
+                    <div class="truncate flex-1 min-w-0">
+                        <div class="text-xs font-semibold ${isActive ? 'text-white' : 'text-white/80'} truncate flex items-center gap-1.5">
+                            <span class="truncate">${tab.title}</span>
+                            <span class="text-[9px] font-monoFeature px-1.5 py-0.5 rounded bg-white/10 text-white/60 shrink-0">#${idx + 1}</span>
+                        </div>
                         <div class="text-[10px] text-white/50">${tab.pageCount || 1} Pages • ${tab.isDemo ? 'Interactive Demo' : 'PDF Document'}</div>
                     </div>
                 </button>
+
+                <!-- Close Paper Button -->
                 <button onclick="closeReaderTab(event, '${tab.id}')" 
-                        class="min-w-[44px] min-h-[44px] flex items-center justify-center text-white/40 hover:text-white rounded-lg active:bg-white/10 transition focus:outline-none touch-manipulation" 
+                        class="min-w-[40px] min-h-[44px] flex items-center justify-center text-white/40 hover:text-white rounded-lg active:bg-white/10 transition focus:outline-none touch-manipulation shrink-0" 
                         title="Close paper">
                     ✕
                 </button>
             </div>
         `;
     }).join('');
+
+    attachDrawerTouchListeners();
 }
 
+function attachDrawerTouchListeners() {
+    const list = document.getElementById('drawer-papers-list');
+    if (!list) return;
+
+    const items = list.querySelectorAll('.drawer-paper-item');
+    items.forEach((item) => {
+        const handle = item.querySelector('.drawer-drag-handle');
+        if (!handle) return;
+
+        handle.addEventListener('touchstart', onDrawerTouchStart, { passive: false });
+        handle.addEventListener('touchmove', onDrawerTouchMove, { passive: false });
+        handle.addEventListener('touchend', onDrawerTouchEnd, { passive: false });
+        handle.addEventListener('touchcancel', onDrawerTouchCancel, { passive: false });
+    });
+}
+
+function onDrawerTouchStart(e) {
+    const item = e.currentTarget.closest('.drawer-paper-item');
+    if (!item) return;
+
+    drawerTouchDragId = item.dataset.tabId;
+    drawerTouchTargetId = null;
+    drawerTouchInsertBefore = false;
+
+    item.classList.add('is-touch-dragging');
+    if (navigator.vibrate) {
+        try { navigator.vibrate(25); } catch (err) {}
+    }
+}
+
+function onDrawerTouchMove(e) {
+    if (!drawerTouchDragId) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetItem = el ? el.closest('.drawer-paper-item') : null;
+
+    // Remove drag lines from all items
+    document.querySelectorAll('.drawer-paper-item').forEach(it => {
+        if (it !== targetItem) {
+            it.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
+    });
+
+    if (targetItem && targetItem.dataset.tabId !== drawerTouchDragId) {
+        drawerTouchTargetId = targetItem.dataset.tabId;
+        const rect = targetItem.getBoundingClientRect();
+        const midPoint = rect.top + rect.height / 2;
+
+        if (touch.clientY < midPoint) {
+            targetItem.classList.add('drag-over-top');
+            targetItem.classList.remove('drag-over-bottom');
+            drawerTouchInsertBefore = true;
+        } else {
+            targetItem.classList.add('drag-over-bottom');
+            targetItem.classList.remove('drag-over-top');
+            drawerTouchInsertBefore = false;
+        }
+    } else {
+        drawerTouchTargetId = null;
+    }
+}
+
+function onDrawerTouchEnd(e) {
+    if (drawerTouchDragId && drawerTouchTargetId && drawerTouchDragId !== drawerTouchTargetId) {
+        const fromIdx = openTabs.findIndex(t => t.id === drawerTouchDragId);
+        const toIdx = openTabs.findIndex(t => t.id === drawerTouchTargetId);
+
+        if (fromIdx !== -1 && toIdx !== -1) {
+            const [movedTab] = openTabs.splice(fromIdx, 1);
+            let targetIdx = openTabs.findIndex(t => t.id === drawerTouchTargetId);
+            if (!drawerTouchInsertBefore) {
+                targetIdx += 1;
+            }
+            targetIdx = Math.max(0, Math.min(openTabs.length, targetIdx));
+            openTabs.splice(targetIdx, 0, movedTab);
+
+            renderReaderTabs();
+            showHubToast(`Moved "${movedTab.title}" to position #${targetIdx + 1}`);
+        }
+    }
+
+    cleanupDrawerDragClasses();
+    drawerTouchDragId = null;
+    drawerTouchTargetId = null;
+}
+
+function onDrawerTouchCancel(e) {
+    cleanupDrawerDragClasses();
+    drawerTouchDragId = null;
+    drawerTouchTargetId = null;
+}
+
+function handleDrawerDragStart(event, tabId) {
+    drawerDraggedTabId = tabId;
+    event.dataTransfer.setData('text/plain', tabId);
+    event.dataTransfer.effectAllowed = 'move';
+    const el = document.getElementById(`drawer-paper-item-${tabId}`);
+    if (el) {
+        requestAnimationFrame(() => el.classList.add('is-touch-dragging'));
+    }
+}
+
+function handleDrawerDragOver(event, targetTabId) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (!drawerDraggedTabId || drawerDraggedTabId === targetTabId) return;
+
+    const targetEl = document.getElementById(`drawer-paper-item-${targetTabId}`);
+    if (!targetEl) return;
+
+    const rect = targetEl.getBoundingClientRect();
+    const midPoint = rect.top + rect.height / 2;
+    if (event.clientY < midPoint) {
+        targetEl.classList.add('drag-over-top');
+        targetEl.classList.remove('drag-over-bottom');
+    } else {
+        targetEl.classList.add('drag-over-bottom');
+        targetEl.classList.remove('drag-over-top');
+    }
+}
+
+function handleDrawerDragEnter(event, targetTabId) {
+    event.preventDefault();
+}
+
+function handleDrawerDragLeave(event, targetTabId) {
+    const targetEl = document.getElementById(`drawer-paper-item-${targetTabId}`);
+    if (targetEl) {
+        targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+}
+
+function handleDrawerDrop(event, targetTabId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const targetEl = document.getElementById(`drawer-paper-item-${targetTabId}`);
+    const insertBefore = targetEl && targetEl.classList.contains('drag-over-top');
+
+    cleanupDrawerDragClasses();
+
+    if (!drawerDraggedTabId || drawerDraggedTabId === targetTabId) {
+        drawerDraggedTabId = null;
+        return;
+    }
+
+    const fromIdx = openTabs.findIndex(t => t.id === drawerDraggedTabId);
+    const toIdx = openTabs.findIndex(t => t.id === targetTabId);
+    if (fromIdx !== -1 && toIdx !== -1) {
+        const [movedTab] = openTabs.splice(fromIdx, 1);
+        let targetIdx = openTabs.findIndex(t => t.id === targetTabId);
+        if (!insertBefore) {
+            targetIdx += 1;
+        }
+        targetIdx = Math.max(0, Math.min(openTabs.length, targetIdx));
+        openTabs.splice(targetIdx, 0, movedTab);
+
+        drawerDraggedTabId = null;
+        renderReaderTabs();
+        showHubToast(`Moved "${movedTab.title}" to position #${targetIdx + 1}`);
+    }
+}
+
+function handleDrawerDragEnd(event) {
+    cleanupDrawerDragClasses();
+    drawerDraggedTabId = null;
+}
+
+function cleanupDrawerDragClasses() {
+    document.querySelectorAll('.drawer-paper-item').forEach(item => {
+        item.classList.remove('is-touch-dragging', 'drag-over-top', 'drag-over-bottom');
+    });
+}
+
+// =====================================================================
+// DESKTOP TABS SYSTEM (WITH '+' BUTTON STUCK TO RIGHTMOST TAB)
+// =====================================================================
 function renderReaderTabs() {
     const activeTab = openTabs.find(t => t.id === activeTabId) || openTabs[0];
 
@@ -855,7 +1074,8 @@ function renderReaderTabs() {
     const tabsBar = document.getElementById('reader-tabs-bar');
     if (!tabsBar) return;
 
-    tabsBar.innerHTML = openTabs.map((tab) => {
+    // Render open tabs
+    const tabsHtml = openTabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         return `
             <div id="reader-tab-${tab.id}"
@@ -879,6 +1099,18 @@ function renderReaderTabs() {
             </div>
         `;
     }).join('');
+
+    // Append desktop '+' button sticking directly to the rightmost index of opened files
+    const desktopPlusBtnHtml = `
+        <button onclick="triggerNewFilePicker()" 
+                id="desktop-new-tab-btn"
+                class="w-7 h-7 rounded-lg bg-white/[0.05] hover:bg-white/[0.15] text-white/70 hover:text-white flex items-center justify-center text-sm font-bold shrink-0 transition focus:outline-none ml-0.5" 
+                title="Open or Upload Another PDF (<20MB)">
+            +
+        </button>
+    `;
+
+    tabsBar.innerHTML = tabsHtml + desktopPlusBtnHtml;
 }
 
 function handleTabDragStart(event, tabId) {
@@ -970,6 +1202,7 @@ function cleanupTabDragClasses() {
         tab.classList.remove('is-dragging', 'drag-over-left', 'drag-over-right');
     });
 }
+
 
 function navigateNextTab(backward = false) {
     if (!openTabs || openTabs.length <= 1) return;
@@ -1589,3 +1822,9 @@ window.closeAccountModal = closeAccountModal;
 window.saveAccountModal = saveAccountModal;
 window.handleLogoutAction = handleLogoutAction;
 window.showHubToast = showHubToast;
+window.handleDrawerDragStart = handleDrawerDragStart;
+window.handleDrawerDragOver = handleDrawerDragOver;
+window.handleDrawerDragEnter = handleDrawerDragEnter;
+window.handleDrawerDragLeave = handleDrawerDragLeave;
+window.handleDrawerDrop = handleDrawerDrop;
+window.handleDrawerDragEnd = handleDrawerDragEnd;

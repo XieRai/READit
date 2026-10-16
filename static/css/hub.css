@@ -348,5 +348,35 @@ body {
     }
 }
 
+/* =====================================================================
+   MOBILE DRAWER PAPER LIST DRAG-AND-DROP REORDERING
+   ===================================================================== */
+.drawer-paper-item {
+    position: relative;
+    transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
 
+.drawer-paper-item.is-touch-dragging {
+    opacity: 0.75;
+    border-color: #76B843 !important;
+    background-color: rgba(118, 184, 67, 0.16) !important;
+    transform: scale(0.98);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    z-index: 30;
+}
 
+.drawer-paper-item.drag-over-top {
+    border-top: 2px solid #76B843 !important;
+    transform: translateY(2px);
+}
+
+.drawer-paper-item.drag-over-bottom {
+    border-bottom: 2px solid #76B843 !important;
+    transform: translateY(-2px);
+}
+
+.drawer-drag-handle {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}

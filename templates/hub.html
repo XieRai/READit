@@ -296,25 +296,26 @@
         <div id="hub-reader-view" class="hidden flex-col h-screen w-full bg-[#181818] overflow-hidden relative">
             
             <!-- Reader Top Bar with Multi-Tab System & Mobile Collapsible Switcher -->
-            <div class="h-14 border-b border-white/[0.08] bg-hubSidebar px-3 sm:px-6 flex items-center justify-between shrink-0 gap-2 sm:gap-3 z-30 relative">
-                <div class="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 overflow-hidden">
-                    <button onclick="closeSmartReader()" class="inline-flex items-center gap-1.5 text-xs font-medium text-white/70 hover:text-white transition px-3 py-2 rounded-full border border-white/15 hover:border-white/35 shrink-0 min-h-[44px] touch-manipulation focus:outline-none" title="Return to Document Hub">
-                        <span>←</span>
+            <div class="h-14 border-b border-white/[0.08] bg-hubSidebar px-2.5 sm:px-6 flex items-center justify-between shrink-0 gap-2 sm:gap-3 z-30 relative w-full">
+                <div class="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 overflow-hidden w-full">
+                    <!-- Back Button ("←" on mobile, "← Hub" on desktop) -->
+                    <button onclick="closeSmartReader()" class="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-white/70 hover:text-white transition px-2.5 sm:px-3 py-2 rounded-full border border-white/15 hover:border-white/35 shrink-0 min-h-[44px] min-w-[44px] touch-manipulation focus:outline-none" title="Return to Document Hub">
+                        <span class="text-sm font-bold">←</span>
                         <span class="hidden sm:inline">Hub</span>
                     </button>
 
-                    <span class="h-5 w-[1px] bg-white/10 shrink-0"></span>
+                    <span class="hidden md:block h-5 w-[1px] bg-white/10 shrink-0"></span>
 
-                    <!-- Mobile Collapsible Paper Switcher Trigger Button (Visible only on < md, touch target >= 44x44px) -->
+                    <!-- Mobile Collapsible Paper Switcher Trigger Button (Visible only on < md, spans all the way across available width) -->
                     <button onclick="togglePaperSwitcherDrawer()" 
                             id="mobile-paper-switcher-btn" 
-                            class="flex md:hidden items-center justify-between gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.18] border border-white/15 text-white transition max-w-[210px] min-h-[44px] focus:outline-none touch-manipulation" 
+                            class="flex md:hidden items-center justify-between gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.18] border border-white/15 text-white transition flex-1 min-w-0 min-h-[44px] focus:outline-none touch-manipulation" 
                             title="Open paper switcher drawer">
-                        <div class="flex items-center gap-1.5 min-w-0">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
                             <span class="w-2 h-2 rounded-full bg-readitGreen shrink-0"></span>
-                            <span id="mobile-active-paper-title" class="text-xs font-medium text-white truncate">Demo File</span>
+                            <span id="mobile-active-paper-title" class="text-xs font-medium text-white truncate text-left">Demo File</span>
                         </div>
-                        <div class="flex items-center gap-1 shrink-0">
+                        <div class="flex items-center gap-1.5 shrink-0 ml-1">
                             <span id="mobile-tab-count-badge" class="px-1.5 py-0.5 rounded-full bg-white/10 text-[10px] font-monoFeature text-white/70">1</span>
                             <svg id="mobile-switcher-chevron" class="w-3.5 h-3.5 text-white/60 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                 <polyline points="6 9 12 15 18 9"></polyline>
