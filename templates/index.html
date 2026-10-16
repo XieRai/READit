@@ -96,10 +96,6 @@
                     </svg>
                     <span id="theme-toggle-label" class="tracking-wide text-[11px] font-monoFeature">Dark</span>
                 </button>
-
-                <button onclick="triggerChromeInstall()" class="btn-emerald-glow text-obsidian font-semibold text-sm sm:text-[15px] px-5 py-2.5 rounded-full">
-                    Add to Chrome
-                </button>
             </nav>
 
             <!-- Mobile Burger Toggle Button -->
@@ -134,7 +130,7 @@
                 </a>
 
                 <!-- Mobile Theme Toggle Option -->
-                <div class="py-2 border-b border-neutral-200/70 dark:border-white/[0.06] flex items-center justify-between">
+                <div class="py-2 flex items-center justify-between">
                     <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Theme</span>
                     <button onclick="toggleTheme()" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-neutral-300 dark:border-white/10 bg-black/[0.04] dark:bg-white/5 text-neutral-700 dark:text-neutral-300 text-xs font-medium">
                         <svg class="w-3.5 h-3.5 hidden dark:block text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -152,12 +148,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                         </svg>
                         <span id="mobile-theme-toggle-label" class="tracking-wide text-[11px] font-monoFeature">Dark</span>
-                    </button>
-                </div>
-
-                <div class="pt-2">
-                    <button onclick="triggerChromeInstall(); closeMobileMenu();" class="btn-emerald-glow text-obsidian font-semibold text-base w-full py-3 rounded-full flex items-center justify-center gap-2">
-                        <span>Add to Chrome</span>
                     </button>
                 </div>
             </nav>
@@ -815,7 +805,7 @@
     <!-- ========================================================================= -->
     <!-- SECTION 3: "YOU MIGHT LOVE IT" TARGET AUDIENCE SECTION (100VH + FOOTER)   -->
     <!-- ========================================================================= -->
-    <section id="audience-section" class="relative z-10 w-full min-h-screen lg:h-screen box-border flex flex-col justify-between border-t border-neutral-200 dark:border-white/[0.08] bg-[#F1F5F3] dark:bg-[#040605] overflow-hidden select-none">
+    <section id="audience-section" class="relative z-10 w-full min-h-screen box-border flex flex-col justify-between border-t border-neutral-200 dark:border-white/[0.08] bg-[#F1F5F3] dark:bg-[#040605] select-none">
         
         <!-- Soft Ambient Center Glow Behind "Love it" -->
         <div class="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[340px] rounded-full bg-emerald-500/[0.08] blur-[110px] pointer-events-none"></div>
@@ -931,28 +921,173 @@
 
         </div>
 
-        <!-- Integrated Minimalist Footer -->
-        <footer class="relative z-10 w-full border-t border-neutral-200 dark:border-white/10 bg-[#E8EDE9]/90 dark:bg-[#050706]/90 backdrop-blur-md py-5 shrink-0">
-            <div class="max-w-[1360px] mx-auto px-6 sm:px-12 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <img src="/assets/image/readit_logo.png" alt="READit" class="h-6 w-auto object-contain">
-                    <span class="xs text-neutral-600 dark:text-neutral-500">© 2025 READit Research Tools. Built for students & researchers.</span>
+        <!-- Upgraded Comprehensive READit Footer -->
+        <footer class="relative z-10 w-full border-t border-neutral-200 dark:border-white/10 bg-[#E8EDE9]/95 dark:bg-[#060807]/95 backdrop-blur-md pt-12 sm:pt-16 pb-8 shrink-0">
+            <div class="max-w-[1360px] mx-auto px-6 sm:px-12">
+                <!-- 5-Column Navigation Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 sm:gap-10 pb-12 border-b border-neutral-300/70 dark:border-white/[0.08]">
+                    
+                    <!-- Brand Summary Column (Takes 2 cols on lg) -->
+                    <div class="col-span-2 space-y-4">
+                        <a href="/" class="inline-flex items-center gap-2 group select-none">
+                            <img src="/assets/image/readit_logo.png" alt="READit Logo" class="h-8 w-auto object-contain">
+                        </a>
+                        <p class="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-sm">
+                            Overcome lexical complexity in dense academic literature. Built for university scholars, students, and research teams worldwide.
+                        </p>
+                        <div class="pt-2 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-monoFeature">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>v1.0.4 Academic Beta • All Systems Operational</span>
+                        </div>
+                    </div>
+
+                    <!-- Column 1: Product -->
+                    <div class="space-y-3.5">
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-neutral-900 dark:text-white font-monoFeature">Product</h4>
+                        <ul class="space-y-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                            <li>
+                                <a href="/hub" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors inline-flex items-center gap-1.5">
+                                    <span>Document Hub</span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emeraldGlow font-monoFeature">/hub</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0)" onclick="openDownloadModal(event)" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Download
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/hub" onclick="openPricingModal(event)" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors inline-flex items-center gap-1.5">
+                                    <span>Pricing</span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emeraldGlow font-monoFeature">/hub</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/hub" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emeraldGlow">
+                                    <span>Launch App</span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 font-monoFeature">/hub</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Column 2: Resource -->
+                    <div class="space-y-3.5">
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-neutral-900 dark:text-white font-monoFeature">Resource</h4>
+                        <ul class="space-y-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                            <li>
+                                <a href="#features-showcase" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Tutorial
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#dataset-section" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Documentation
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#dataset-section" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Academic Lexicon
+                                </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0)" onclick="openChangelogModal(event)" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Changelog
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Column 3: Legal -->
+                    <div class="space-y-3.5">
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-neutral-900 dark:text-white font-monoFeature">Legal</h4>
+                        <ul class="space-y-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                            <li>
+                                <a href="javascript:void(0)" onclick="openLegalModal('privacy', event)" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Privacy Policy
+                                </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0)" onclick="openLegalModal('terms', event)" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors">
+                                    Terms of Service
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Column 4: Community -->
+                    <div class="space-y-3.5">
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-neutral-900 dark:text-white font-monoFeature">Community</h4>
+                        <ul class="space-y-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                            <li>
+                                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors inline-flex items-center gap-1.5">
+                                    <span>LinkedIn</span>
+                                    <svg class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors inline-flex items-center gap-1.5">
+                                    <span>Instagram</span>
+                                    <svg class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="hover:text-emerald-600 dark:hover:text-emeraldGlow transition-colors inline-flex items-center gap-1.5">
+                                    <span>GitHub</span>
+                                    <svg class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
                 </div>
-                <div class="flex items-center gap-6 text-xs text-neutral-600 dark:text-neutral-400">
-                    <a href="/hub" class="hover:text-neutral-950 dark:hover:text-white transition text-emerald-600 dark:text-emeraldGlow">Document Hub</a>
-                    <a href="#features-showcase" class="hover:text-neutral-950 dark:hover:text-white transition">Interactive PDF Demo</a>
-                    <a href="#dataset-section" class="hover:text-neutral-950 dark:hover:text-white transition">Multilingual Dataset</a>
-                    <button onclick="triggerChromeInstall()" class="text-emerald-600 dark:text-emeraldGlow hover:underline font-medium">Install Free Extension →</button>
+
+                <!-- Bottom Copyright & Status Bar -->
+                <div class="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 dark:text-neutral-500 gap-4">
+                    <p>© 2025 READit Research Technologies. All rights reserved.</p>
+                    <div class="flex items-center gap-4">
+                        <span>Built for high-velocity scholarly comprehension</span>
+                        <span class="w-1 h-1 rounded-full bg-neutral-400"></span>
+                        <span class="font-monoFeature">EN / ID Ready</span>
+                    </div>
                 </div>
             </div>
         </footer>
 
     </section>
 
+    <!-- Interactive Information & Legal Modal -->
+    <div id="landing-info-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 transition-all duration-200">
+        <div class="bg-white dark:bg-[#0C1210] border border-neutral-200 dark:border-white/10 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-neutral-200 dark:border-white/10 flex items-center justify-between bg-neutral-50/70 dark:bg-white/[0.02]">
+                <div class="flex items-center gap-2.5">
+                    <span id="modal-badge" class="px-2 py-0.5 text-[11px] font-monoFeature uppercase tracking-wider rounded bg-emerald-500/10 text-emerald-600 dark:text-emeraldGlow">Legal</span>
+                    <h3 id="modal-title" class="text-base font-semibold text-neutral-900 dark:text-white">Privacy Policy</h3>
+                </div>
+                <button onclick="closeLandingModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-white/10 transition-colors" aria-label="Close modal">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <!-- Modal Body Content -->
+            <div id="modal-content" class="p-6 sm:p-8 overflow-y-auto space-y-4 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+                <!-- Dynamically populated via landing.js -->
+            </div>
+            <!-- Modal Footer -->
+            <div class="px-6 py-3.5 border-t border-neutral-200 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] flex items-center justify-between">
+                <span class="text-xs text-neutral-500 font-monoFeature">READit v1.0.4</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="closeLandingModal()" class="px-4 py-2 text-xs font-medium rounded-lg text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors">Close</button>
+                    <a id="modal-action-btn" href="/hub" class="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 text-neutral-950 hover:bg-emerald-400 transition-colors">Launch Hub →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-white dark:bg-[#121A17] border border-emerald-500/40 dark:border-emeraldGlow/40 text-neutral-900 dark:text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3">
         <span class="w-2.5 h-2.5 rounded-full bg-emeraldGlow"></span>
-        <span id="toast-message" class="text-sm font-medium">READit Chrome Extension ready to install!</span>
+        <span id="toast-message" class="text-sm font-medium">Welcome to READit Document Hub!</span>
     </div>
 
     <!-- Separated Interactive Logic Script -->

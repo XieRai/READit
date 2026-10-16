@@ -566,6 +566,210 @@ if (document.readyState === 'loading') {
     initTheme();
 }
 
+// =====================================================================
+// FOOTER INFORMATION & LEGAL MODALS CONTROLLER
+// =====================================================================
+const modalData = {
+    privacy: {
+        badge: "Legal",
+        title: "Privacy Policy",
+        actionText: "Launch Hub →",
+        actionHref: "/hub",
+        html: `
+            <div class="space-y-4">
+                <p class="text-xs text-neutral-500 font-monoFeature">Last updated: October 2025</p>
+                <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs">
+                    <strong>Zero Data Retention Guarantee:</strong> Your academic documents are processed in-memory and client-side. We never store, sell, or train foundational models on your uploaded manuscripts.
+                </div>
+                <h4 class="font-semibold text-neutral-900 dark:text-white text-sm">1. Document Processing</h4>
+                <p>When you drag & drop or upload academic PDFs to READit, document parsing and text vectorization occur locally within your browser session or temporarily in active runtime memory. Files are immediately released upon closing the tab.</p>
+                <h4 class="font-semibold text-neutral-900 dark:text-white text-sm">2. AI Integration & API Keys</h4>
+                <p>READit allows users to connect custom LLM keys (such as Google Gemini, OpenAI, or local Ollama). Your API keys are saved exclusively in your browser's private <code class="font-mono text-xs px-1 py-0.5 rounded bg-black/5 dark:bg-white/10">localStorage</code> and are never transmitted to any third-party telemetry servers.</p>
+                <h4 class="font-semibold text-neutral-900 dark:text-white text-sm">3. Analytics & Telemetry</h4>
+                <p>We do not run tracking pixels, intrusive ad network tags, or third-party behavioral trackers. Only anonymous performance metrics (such as page rendering latency) are recorded to ensure app reliability.</p>
+            </div>
+        `
+    },
+    terms: {
+        badge: "Legal",
+        title: "Terms of Service",
+        actionText: "Acknowledge & Launch →",
+        actionHref: "/hub",
+        html: `
+            <div class="space-y-4">
+                <p class="text-xs text-neutral-500 font-monoFeature">Effective Date: October 2025</p>
+                <h4 class="font-semibold text-neutral-900 dark:text-white text-sm">1. Scholarly Fair Use</h4>
+                <p>READit is intended for educational, academic research, literature synthesis, and reading enhancement. Users retain complete intellectual property ownership over any uploaded manuscripts, dissertations, and research papers.</p>
+                <h4 class="font-semibold text-neutral-900 dark:text-white text-sm">2. AI-Generated Synthesis & Accuracy</h4>
+                <p>READit provides automated lexical simplification, contextual definitions, and multilingual translations. While our algorithms strive for the highest academic rigor, researchers are advised to verify critical formulas, statistical findings, and citations prior to publishing.</p>
+                <h4 class="font-semibold text-neutral-900 dark:text-white text-sm">3. Acceptable Use</h4>
+                <p>You agree not to use the service for unauthorized automated scraping, distributing malware, or breaching copyright protections on proprietary academic databases.</p>
+            </div>
+        `
+    },
+    changelog: {
+        badge: "Changelog",
+        title: "Platform Release Notes",
+        actionText: "Try Latest Version →",
+        actionHref: "/hub",
+        html: `
+            <div class="space-y-6">
+                <div class="border-l-2 border-emerald-500 pl-4 space-y-1.5">
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-neutral-900 dark:text-white text-sm">v1.0.4 — Multi-Tab & Drag Reordering</span>
+                        <span class="text-[10px] font-monoFeature px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emeraldGlow">Current</span>
+                    </div>
+                    <p class="text-xs text-neutral-500">Released October 2025</p>
+                    <ul class="list-disc list-inside text-xs space-y-1 pt-1 text-neutral-600 dark:text-neutral-400">
+                        <li>Multi-tab PDF reader with native HTML5 drag-and-drop tab sequence reordering.</li>
+                        <li>Mobile-optimized Document Hub with 2-column grid and collapsible reader controls.</li>
+                        <li>Collapsible sidebar with icon preservation and floating bilingual toggle (EN / ID).</li>
+                        <li>Smooth login/signup transition cards and secure custom API key management.</li>
+                    </ul>
+                </div>
+                <div class="border-l-2 border-neutral-300 dark:border-white/20 pl-4 space-y-1.5 opacity-80">
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-neutral-900 dark:text-white text-sm">v1.0.0 — Public Beta Launch</span>
+                    </div>
+                    <p class="text-xs text-neutral-500">Released September 2025</p>
+                    <ul class="list-disc list-inside text-xs space-y-1 pt-1 text-neutral-600 dark:text-neutral-400">
+                        <li>Core lexical simplification engine with academic paper split-screen reader.</li>
+                        <li>Bilingual contextual dictionary supporting English and Indonesian scholarly lexicons.</li>
+                    </ul>
+                </div>
+            </div>
+        `
+    },
+    download: {
+        badge: "App",
+        title: "Install & Launch READit",
+        actionText: "Open Document Hub →",
+        actionHref: "/hub",
+        html: `
+            <div class="space-y-4">
+                <p>READit is engineered as a modern, zero-install Web Application and Progressive Web App (PWA). You don't need heavy installers or desktop background services to read and synthesize dense PDFs.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div class="p-3.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02]">
+                        <div class="font-semibold text-neutral-900 dark:text-white text-xs mb-1">Web Platform</div>
+                        <p class="text-xs text-neutral-500">Works instantly in Chrome, Safari, Edge, Firefox, and Brave without installation.</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02]">
+                        <div class="font-semibold text-neutral-900 dark:text-white text-xs mb-1">Install as App (PWA)</div>
+                        <p class="text-xs text-neutral-500">Click the install icon in your browser address bar to add READit to your desktop dock or home screen.</p>
+                    </div>
+                </div>
+            </div>
+        `
+    },
+    pricing: {
+        badge: "Pricing",
+        title: "Academic Beta Pricing",
+        actionText: "Get Started Free →",
+        actionHref: "/hub",
+        html: `
+            <div class="space-y-4">
+                <div class="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-bold text-neutral-900 dark:text-white text-base">Community Academic Plan</h4>
+                            <p class="text-xs text-neutral-500">Free for all students, postgraduates, and researchers</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-2xl font-bold text-emerald-600 dark:text-emeraldGlow">$0</span>
+                            <span class="text-xs text-neutral-500 block">Forever Free</span>
+                        </div>
+                    </div>
+                </div>
+                <ul class="space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
+                    <li class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <span>Multi-tab PDF Reader with unlimited local document uploads (up to 20MB per file)</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <span>Instant lexical simplifier and interactive academic dictionary</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <span>Bring your own LLM API Key (Gemini, OpenAI) for zero data sharing</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <span>English & Indonesian bilingual translation support</span>
+                    </li>
+                </ul>
+            </div>
+        `
+    }
+};
+
+function openLandingModal(key, event) {
+    if (event) {
+        event.preventDefault();
+    }
+    const data = modalData[key];
+    if (!data) return;
+
+    const modal = document.getElementById('landing-info-modal');
+    const badge = document.getElementById('modal-badge');
+    const title = document.getElementById('modal-title');
+    const content = document.getElementById('modal-content');
+    const actionBtn = document.getElementById('modal-action-btn');
+
+    if (!modal || !title || !content) return;
+
+    if (badge) badge.textContent = data.badge;
+    title.textContent = data.title;
+    content.innerHTML = data.html;
+
+    if (actionBtn) {
+        actionBtn.textContent = data.actionText;
+        actionBtn.setAttribute('href', data.actionHref);
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeLandingModal() {
+    const modal = document.getElementById('landing-info-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.classList.remove('overflow-hidden');
+}
+
+function openLegalModal(type, event) {
+    openLandingModal(type === 'privacy' ? 'privacy' : 'terms', event);
+}
+
+function openChangelogModal(event) {
+    openLandingModal('changelog', event);
+}
+
+function openDownloadModal(event) {
+    openLandingModal('download', event);
+}
+
+function openPricingModal(event) {
+    openLandingModal('pricing', event);
+}
+
+// Global modal dismiss listeners
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeLandingModal();
+    }
+});
+
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('landing-info-modal');
+    if (modal && e.target === modal) {
+        closeLandingModal();
+    }
+});
+
 // Expose functions globally for inline HTML onclick handlers
 window.selectPreset = selectPreset;
 window.cycleNextPreset = cycleNextPreset;
@@ -581,5 +785,12 @@ window.selectDatasetWord = selectDatasetWord;
 window.toggleMobileMenu = toggleMobileMenu;
 window.closeMobileMenu = closeMobileMenu;
 window.toggleTheme = toggleTheme;
+window.openLandingModal = openLandingModal;
+window.closeLandingModal = closeLandingModal;
+window.openLegalModal = openLegalModal;
+window.openChangelogModal = openChangelogModal;
+window.openDownloadModal = openDownloadModal;
+window.openPricingModal = openPricingModal;
+
 
 
