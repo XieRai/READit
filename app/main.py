@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes import router as api_router
+from app.config import SUPABASE_URL, SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID
 
 # ---------------------------------------------------------------------------
 # Resolve project-root-relative paths
@@ -55,19 +56,35 @@ app.include_router(api_router)
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the SaaS landing page."""
-    return templates.TemplateResponse(name="index.html", request=request)
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.get("/hub", response_class=HTMLResponse)
 async def hub(request: Request):
     """Serve the READit Document Hub page."""
-    return templates.TemplateResponse(name="hub.html", request=request)
+    return templates.TemplateResponse(
+        request=request,
+        name="hub.html",
+        context={
+            "supabase_url": SUPABASE_URL,
+            "supabase_anon_key": SUPABASE_ANON_KEY,
+            "google_client_id": GOOGLE_CLIENT_ID,
+        },
+    )
 
 
 @app.get("/documents", response_class=HTMLResponse)
 async def documents(request: Request):
     """Alias route for the Document Hub."""
-    return templates.TemplateResponse(name="hub.html", request=request)
+    return templates.TemplateResponse(
+        request=request,
+        name="hub.html",
+        context={
+            "supabase_url": SUPABASE_URL,
+            "supabase_anon_key": SUPABASE_ANON_KEY,
+            "google_client_id": GOOGLE_CLIENT_ID,
+        },
+    )
 
 
 @app.get("/reader")

@@ -26,6 +26,19 @@
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         }
     </script>
+
+    <!-- Supabase JS Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Google Identity Services (GIS) for In-Situ Popups & One-Tap (No Supabase URL exposure) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        window.ENV = {
+            SUPABASE_URL: "{{ supabase_url or '' }}",
+            SUPABASE_ANON_KEY: "{{ supabase_anon_key or '' }}",
+            GOOGLE_CLIENT_ID: "{{ google_client_id or '' }}"
+        };
+    </script>
 </head>
 <body class="h-screen w-screen overflow-hidden flex select-none bg-hubCanvas text-white relative">
 
@@ -323,26 +336,25 @@
                         </div>
                     </button>
 
-                    <!-- Desktop Multi-Tab System Container (Hidden on mobile < md) -->
-                    <div id="reader-tabs-bar" class="hidden md:flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 flex-1">
-                        <!-- Dynamic tabs rendered by JS -->
-                    </div>
-
-                    <!-- New Tab / Open File Button in Tab Bar (>= 44x44px on mobile) -->
-                    <button onclick="triggerNewFilePicker()" class="w-9 h-9 md:w-7 md:h-7 rounded-lg bg-white/[0.05] hover:bg-white/[0.15] text-white/70 hover:text-white flex items-center justify-center text-sm font-bold shrink-0 transition min-w-[40px] min-h-[40px] md:min-w-0 md:min-h-0 touch-manipulation focus:outline-none" title="Open or Upload Another PDF (<20MB)">
+                    <!-- Mobile "+" Button in same header row (>= 44x44px touch target) -->
+                    <button onclick="triggerNewFilePicker()" 
+                            id="mobile-reader-new-tab-btn"
+                            class="flex md:hidden w-11 h-11 rounded-full bg-white/[0.06] hover:bg-white/[0.15] active:bg-white/[0.2] border border-white/15 text-white/80 hover:text-white items-center justify-center text-lg font-bold shrink-0 transition min-w-[44px] min-h-[44px] touch-manipulation focus:outline-none" 
+                            title="Open or Upload Another PDF (<20MB)">
                         +
                     </button>
+
+                    <!-- Desktop Multi-Tab System Container (Hidden on mobile < md, tabs + '+' stick together) -->
+                    <div id="reader-tabs-bar" class="hidden md:flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 flex-1">
+                        <!-- Dynamic tabs + sticky '+' button rendered by JS -->
+                    </div>
                 </div>
 
-                <div class="flex items-center gap-3 shrink-0">
-                    <span class="hidden lg:inline-block text-[11px] text-white/45">
+                <!-- Desktop Helper Text (Translation toggle removed as requested, keeping hovering one) -->
+                <div class="hidden lg:flex items-center gap-3 shrink-0">
+                    <span class="text-[11px] text-white/45">
                         Hover sentence to highlight • Click for inline guide
                     </span>
-                    <!-- Desktop Top Language Toggle (Synchronized with floating bottom bar) -->
-                    <div class="hidden md:flex items-center bg-[#252525] border border-white/10 rounded-full p-0.5 text-[11px]">
-                        <button onclick="setReaderLang('en')" id="reader-lang-en" class="px-3 py-1 rounded-full bg-readitGreen text-black font-semibold transition">Simple EN</button>
-                        <button onclick="setReaderLang('id')" id="reader-lang-id" class="px-3 py-1 rounded-full text-white/60 hover:text-white transition">Bahasa ID</button>
-                    </div>
                 </div>
             </div>
 
@@ -353,7 +365,10 @@
             <div id="reader-paper-switcher-drawer" class="paper-switcher-drawer fixed md:hidden top-14 left-0 right-0 z-30 bg-[#1D1D1D]/98 backdrop-blur-2xl border-b border-white/15 shadow-2xl transition-all duration-300 overflow-hidden max-h-0 opacity-0 pointer-events-none">
                 <div class="p-4 space-y-3 max-w-lg mx-auto">
                     <div class="flex items-center justify-between px-1">
-                        <span class="text-xs font-monoFeature uppercase tracking-wider text-white/50">Open Documents</span>
+                        <div>
+                            <span class="text-xs font-monoFeature uppercase tracking-wider text-white/50 block">Open Documents</span>
+                            <span class="text-[10px] text-white/40 block">Drag items or grip handle to reorder index</span>
+                        </div>
                         <span class="text-[11px] text-white/40 font-monoFeature" id="drawer-paper-counter">1 paper open</span>
                     </div>
                     

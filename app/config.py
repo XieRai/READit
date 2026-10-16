@@ -14,6 +14,14 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 HOST: str = os.getenv("HOST", "127.0.0.1")
 PORT: int = int(os.getenv("PORT", "8000"))
 
+# Supabase configuration
+SUPABASE_PROJECT_REF: str = os.getenv("SUPABASE_PROJECT_REF", "ecnbupsjpwesvokwszpe")
+SUPABASE_URL: str = os.getenv("SUPABASE_URL", "https://ecnbupsjpwesvokwszpe.supabase.co")
+SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_ACCESS_TOKEN: str = os.getenv("SUPABASE_ACCESS_TOKEN", "")
+GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "246901689836-pv7f039tveaqjcpgpf8dg6kr3rals8ba.apps.googleusercontent.com")
+
 
 def get_gemini_api_key() -> str:
     """Read the latest GEMINI_API_KEY directly from .env file or environment."""

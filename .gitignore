@@ -4,3 +4,4 @@ __pycache__/
 *.db
 cloudflared.exe
 *.zip
+mcp_config.json

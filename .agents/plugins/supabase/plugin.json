@@ -1,0 +1,4 @@
+{
+  "name": "supabase",
+  "description": "Supabase integration plugin providing database, auth, and storage MCP tools."
+}

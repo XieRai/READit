@@ -18,8 +18,35 @@ let isAccountDrawerOpen = false;
 let isSidebarMinimized = false;
 let pendingUploadFiles = [];
 let dragCounter = 0;
+let supabaseClient = null;
 
-function initAccountState() {
+function getSupabase() {
+    if (supabaseClient) return supabaseClient;
+    const url = (window.ENV && window.ENV.SUPABASE_URL) || 'https://ecnbupsjpwesvokwszpe.supabase.co';
+    const key = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbmJ1cHNqcHdlc3Zva3dzenBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMzc4MDksImV4cCI6MjEwNzcxMzgwOX0.IwOoWQq4M78LXNd7OuuHFydf0xnz75N4SpDSqYVxAuo';
+    if (window.supabase && url && key) {
+        supabaseClient = window.supabase.createClient(url, key);
+    }
+    return supabaseClient;
+}
+
+function applySupabaseUser(user) {
+    if (!user) return;
+    const meta = user.user_metadata || {};
+    const name = meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'Researcher');
+    currentUser = {
+        id: user.id,
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        email: user.email || '',
+        avatarUrl: meta.avatar_url || meta.picture || null,
+        plan: 'Free plan'
+    };
+    isLoggedIn = true;
+    localStorage.setItem('readit_user', JSON.stringify(currentUser));
+    updateAccountUI();
+}
+
+function loadFallbackUser() {
     const saved = localStorage.getItem('readit_user');
     if (saved) {
         try {
@@ -32,6 +59,41 @@ function initAccountState() {
     } else {
         currentUser = null;
         isLoggedIn = false;
+    }
+}
+
+async function initAccountState() {
+    const sb = getSupabase();
+    if (sb) {
+        try {
+            const { data: { session } } = await sb.auth.getSession();
+            if (session && session.user) {
+                applySupabaseUser(session.user);
+            } else {
+                loadFallbackUser();
+            }
+
+            // Listen for OAuth redirects and auth state changes
+            sb.auth.onAuthStateChange((event, session) => {
+                if (session && session.user) {
+                    applySupabaseUser(session.user);
+                    if (event === 'SIGNED_IN') {
+                        showHubToast(`Welcome, ${currentUser.name}`);
+                        triggerPendingUploadsIfAny();
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    currentUser = null;
+                    isLoggedIn = false;
+                    localStorage.removeItem('readit_user');
+                    updateAccountUI();
+                }
+            });
+        } catch (err) {
+            console.warn('Supabase auth init:', err);
+            loadFallbackUser();
+        }
+    } else {
+        loadFallbackUser();
     }
     updateAccountUI();
 }
@@ -46,12 +108,22 @@ function updateAccountUI() {
 
     if (isLoggedIn && currentUser) {
         if (avatar) {
-            avatar.className = "w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 border border-white/20 flex items-center justify-center text-xs text-white font-bold shrink-0";
-            avatar.textContent = (currentUser.name || 'U').charAt(0).toUpperCase();
+            if (currentUser.avatarUrl) {
+                avatar.className = "w-7 h-7 rounded-full overflow-hidden border border-white/20 shrink-0";
+                avatar.innerHTML = `<img src="${currentUser.avatarUrl}" alt="${currentUser.name}" class="w-full h-full object-cover">`;
+            } else {
+                avatar.className = "w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 border border-white/20 flex items-center justify-center text-xs text-white font-bold shrink-0";
+                avatar.textContent = (currentUser.name || 'U').charAt(0).toUpperCase();
+            }
         }
         if (mobileAvatar) {
-            mobileAvatar.className = "w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 border border-white/20 flex items-center justify-center text-xs text-white font-bold shrink-0";
-            mobileAvatar.textContent = (currentUser.name || 'U').charAt(0).toUpperCase();
+            if (currentUser.avatarUrl) {
+                mobileAvatar.className = "w-8 h-8 rounded-full overflow-hidden border border-white/20 shrink-0";
+                mobileAvatar.innerHTML = `<img src="${currentUser.avatarUrl}" alt="${currentUser.name}" class="w-full h-full object-cover">`;
+            } else {
+                mobileAvatar.className = "w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 border border-white/20 flex items-center justify-center text-xs text-white font-bold shrink-0";
+                mobileAvatar.textContent = (currentUser.name || 'U').charAt(0).toUpperCase();
+            }
         }
         if (nameLabel) nameLabel.textContent = currentUser.name || 'Nama Akun';
         if (planLabel) planLabel.textContent = currentUser.plan || 'Free plan';
@@ -78,6 +150,7 @@ function updateAccountUI() {
         isAccountDrawerOpen = false;
     }
 }
+
 
 let isMobileSidebarOpen = false;
 
@@ -299,7 +372,101 @@ function triggerPendingUploadsIfAny() {
     }
 }
 
-function handleGoogleSignIn() {
+function initGoogleIdentity() {
+    if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
+    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '246901689836-pv7f039tveaqjcpgpf8dg6kr3rals8ba.apps.googleusercontent.com';
+    if (!clientId) return;
+
+    try {
+        window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
+        });
+    } catch (e) {
+        console.warn('Google Identity initialization error:', e);
+    }
+}
+
+async function handleGoogleCredentialResponse(response) {
+    if (!response || !response.credential) return;
+    const sb = getSupabase();
+    if (sb) {
+        showHubToast('Signing in with Google...');
+        try {
+            const { data, error } = await sb.auth.signInWithIdToken({
+                provider: 'google',
+                token: response.credential
+            });
+            if (error) {
+                console.warn('signInWithIdToken note:', error);
+                showHubToast(`Google sign-in: ${error.message}`);
+                return;
+            }
+            if (data && data.user) {
+                applySupabaseUser(data.user);
+                closeAuthModal();
+                showHubToast(`Welcome, ${currentUser.name}!`);
+                triggerPendingUploadsIfAny();
+            }
+        } catch (err) {
+            console.error('Google ID token authentication error:', err);
+        }
+    }
+}
+
+async function handleGoogleSignIn() {
+    const sb = getSupabase();
+    if (!sb) {
+        fallbackDemoGoogleLogin();
+        return;
+    }
+
+    // Attempt Google Identity Services in-situ prompt (shows "READit" directly, zero domain redirect)
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+        initGoogleIdentity();
+        window.google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                console.log('One-Tap prompt not active, falling back to direct OAuth redirect.');
+                fallbackToOAuthRedirect(sb);
+            }
+        });
+        return;
+    }
+
+    fallbackToOAuthRedirect(sb);
+}
+
+async function fallbackToOAuthRedirect(sb) {
+    try {
+        showHubToast('Redirecting to Google...');
+        const { data, error } = await sb.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin + '/hub',
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent'
+                }
+            }
+        });
+
+        if (error) {
+            console.warn('Google sign-in error:', error);
+            showHubToast(`Sign-in error: ${error.message}`);
+            fallbackDemoGoogleLogin();
+        }
+    } catch (err) {
+        console.error('Google OAuth exception:', err);
+        fallbackDemoGoogleLogin();
+    }
+}
+
+
+
+
+function fallbackDemoGoogleLogin() {
     currentUser = {
         name: 'Google Scholar',
         email: 'scholar@gmail.com',
@@ -313,15 +480,43 @@ function handleGoogleSignIn() {
     triggerPendingUploadsIfAny();
 }
 
-function handleEmailSignIn(event) {
-    event.preventDefault();
+async function handleEmailSignIn(event) {
+    if (event) event.preventDefault();
     const emailInput = document.getElementById('signin-email-input');
-    const email = (emailInput && emailInput.value ? emailInput.value : 'researcher@academic.edu').trim();
-    const namePart = email.split('@')[0] || 'Researcher';
-    const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    const passwordInput = document.getElementById('signin-password-input');
+    const email = (emailInput && emailInput.value ? emailInput.value : '').trim();
+    const password = (passwordInput && passwordInput.value ? passwordInput.value : '').trim();
 
+    if (!email || !password) {
+        showHubToast('Please enter both email and password');
+        return;
+    }
+
+    const sb = getSupabase();
+    if (sb) {
+        try {
+            showHubToast('Signing in...');
+            const { data, error } = await sb.auth.signInWithPassword({ email, password });
+            if (error) {
+                showHubToast(`Sign in failed: ${error.message}`);
+                return;
+            }
+            if (data && data.user) {
+                applySupabaseUser(data.user);
+                closeAuthModal();
+                showHubToast(`Welcome back, ${currentUser.name}`);
+                triggerPendingUploadsIfAny();
+                return;
+            }
+        } catch (err) {
+            console.warn('Supabase signin error:', err);
+        }
+    }
+
+    // Local fallback
+    const namePart = email.split('@')[0] || 'Researcher';
     currentUser = {
-        name: formattedName,
+        name: namePart.charAt(0).toUpperCase() + namePart.slice(1),
         email: email,
         plan: 'Free plan'
     };
@@ -333,13 +528,48 @@ function handleEmailSignIn(event) {
     triggerPendingUploadsIfAny();
 }
 
-function handleEmailSignUp(event) {
-    event.preventDefault();
+async function handleEmailSignUp(event) {
+    if (event) event.preventDefault();
     const nameInput = document.getElementById('signup-name-input');
     const emailInput = document.getElementById('signup-email-input');
-    const name = (nameInput && nameInput.value ? nameInput.value : 'New Researcher').trim();
-    const email = (emailInput && emailInput.value ? emailInput.value : 'user@readit.org').trim();
+    const passwordInput = document.getElementById('signup-password-input');
+    const name = (nameInput && nameInput.value ? nameInput.value : 'Researcher').trim();
+    const email = (emailInput && emailInput.value ? emailInput.value : '').trim();
+    const password = (passwordInput && passwordInput.value ? passwordInput.value : '').trim();
 
+    if (!email || !password) {
+        showHubToast('Please fill in email and password');
+        return;
+    }
+
+    const sb = getSupabase();
+    if (sb) {
+        try {
+            showHubToast('Creating account...');
+            const { data, error } = await sb.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: { full_name: name }
+                }
+            });
+            if (error) {
+                showHubToast(`Sign up failed: ${error.message}`);
+                return;
+            }
+            if (data && data.user) {
+                applySupabaseUser(data.user);
+                closeAuthModal();
+                showHubToast(`Account created! Welcome, ${currentUser.name}`);
+                triggerPendingUploadsIfAny();
+                return;
+            }
+        } catch (err) {
+            console.warn('Supabase signup error:', err);
+        }
+    }
+
+    // Local fallback
     currentUser = {
         name: name,
         email: email,
@@ -353,13 +583,22 @@ function handleEmailSignUp(event) {
     triggerPendingUploadsIfAny();
 }
 
-function handleLogoutAction() {
+async function handleLogoutAction() {
+    const sb = getSupabase();
+    if (sb) {
+        try {
+            await sb.auth.signOut();
+        } catch (err) {
+            console.warn('Sign-out error:', err);
+        }
+    }
     isLoggedIn = false;
     currentUser = null;
     localStorage.removeItem('readit_user');
     updateAccountUI();
     showHubToast('Signed out of READit');
 }
+
 
 // =====================================================================
 // PRE-BAKED DEMO FILE SENTENCE DATA
@@ -1762,7 +2001,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initSidebarState();
     initGlobalDragAndDrop();
     renderHubDocuments();
+    setTimeout(initGoogleIdentity, 600);
 });
+
 
 // Shortcuts: Escape closes modals, Ctrl+B / Cmd+B toggles sidebar, Ctrl+Q cycles tabs
 window.addEventListener('keydown', (e) => {
