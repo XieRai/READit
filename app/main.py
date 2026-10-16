@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -70,8 +70,8 @@ async def documents(request: Request):
     return templates.TemplateResponse(name="hub.html", request=request)
 
 
-@app.get("/reader", response_class=HTMLResponse)
-async def reader(request: Request):
-    """Serve the interactive academic paper reader."""
-    return templates.TemplateResponse(name="reader.html", request=request)
+@app.get("/reader")
+async def reader():
+    """Redirect legacy reader route to Document Hub SPA."""
+    return RedirectResponse(url="/hub", status_code=307)
 
