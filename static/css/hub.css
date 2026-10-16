@@ -99,59 +99,62 @@ body {
     transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-#hub-sidebar.sidebar-collapsed {
-    width: 68px !important;
-}
+/* Collapsed mode is strictly enabled on Desktop viewports (>= 768px) */
+@media (min-width: 768px) {
+    #hub-sidebar.sidebar-collapsed {
+        width: 68px !important;
+    }
 
-#hub-sidebar.sidebar-collapsed .sidebar-label,
-#hub-sidebar.sidebar-collapsed #account-chevron-icon {
-    display: none !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
+    #hub-sidebar.sidebar-collapsed .sidebar-label,
+    #hub-sidebar.sidebar-collapsed #account-chevron-icon {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
 
-#hub-sidebar.sidebar-collapsed .sidebar-header {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-    justify-content: center !important;
-}
+    #hub-sidebar.sidebar-collapsed .sidebar-header {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        justify-content: center !important;
+    }
 
-#hub-sidebar.sidebar-collapsed #sidebar-toggle-btn {
-    position: absolute;
-    right: -13px;
-    top: 24px;
-    z-index: 30;
-    background: #282828;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
+    #hub-sidebar.sidebar-collapsed #sidebar-toggle-btn {
+        position: absolute;
+        right: -13px;
+        top: 24px;
+        z-index: 30;
+        background: #282828;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
 
-#hub-sidebar.sidebar-collapsed #sidebar-toggle-icon {
-    transform: rotate(180deg);
-}
+    #hub-sidebar.sidebar-collapsed #sidebar-toggle-icon {
+        transform: rotate(180deg);
+    }
 
-#hub-sidebar.sidebar-collapsed .sidebar-nav-container {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-}
+    #hub-sidebar.sidebar-collapsed .sidebar-nav-container {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
 
-#hub-sidebar.sidebar-collapsed .sidebar-nav-btn {
-    padding: 0.55rem !important;
-    justify-content: center !important;
-    border-radius: 12px !important;
-}
+    #hub-sidebar.sidebar-collapsed .sidebar-nav-btn {
+        padding: 0.55rem !important;
+        justify-content: center !important;
+        border-radius: 12px !important;
+    }
 
-#hub-sidebar.sidebar-collapsed .sidebar-footer {
-    padding-left: 0.6rem !important;
-    padding-right: 0.6rem !important;
-    justify-content: center !important;
-}
+    #hub-sidebar.sidebar-collapsed .sidebar-footer {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        justify-content: center !important;
+    }
 
-#hub-sidebar.sidebar-collapsed #hub-account-trigger {
-    justify-content: center !important;
-    pointer-events: none !important;
-    cursor: not-allowed !important;
-    opacity: 0.65 !important;
+    #hub-sidebar.sidebar-collapsed #hub-account-trigger {
+        justify-content: center !important;
+        pointer-events: none !important;
+        cursor: not-allowed !important;
+        opacity: 0.65 !important;
+    }
 }
 
 /* =====================================================================
@@ -241,4 +244,109 @@ body {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
 }
+
+/* =====================================================================
+   COLLAPSIBLE PAPER SWITCHER DRAWER (MOBILE VIEWPORT)
+   ===================================================================== */
+.paper-switcher-drawer {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+
+.paper-switcher-drawer.open {
+    max-height: 80vh !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Floating Language Action Bar styling */
+#reader-floating-action-bar {
+    filter: drop-shadow(0 16px 36px rgba(0, 0, 0, 0.7));
+}
+
+/* Touch manipulation & safe responsive hitboxes (>= 44x44px) */
+.touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile Sidebar (Off-Canvas Drawer) - Always shows full width and all button text */
+@media (max-width: 767px) {
+    #hub-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 260px !important;
+        max-width: 85vw !important;
+        z-index: 50 !important;
+        box-shadow: 6px 0 28px rgba(0, 0, 0, 0.75) !important;
+    }
+
+    /* Force all button labels and text to always display on mobile */
+    #hub-sidebar .sidebar-label {
+        display: inline-block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+
+    #hub-sidebar .sidebar-nav-container {
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+    }
+
+    #hub-sidebar .sidebar-nav-btn {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 0.75rem !important;
+        padding: 0.65rem 1rem !important;
+        min-height: 44px !important;
+        border-radius: 9999px !important;
+        width: 100% !important;
+        text-align: left !important;
+    }
+
+    #hub-sidebar .sidebar-nav-btn .sidebar-label {
+        display: inline-block !important;
+        font-size: 13.5px !important;
+        font-weight: 500 !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    #hub-sidebar .sidebar-header {
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+        justify-content: space-between !important;
+    }
+
+    #hub-sidebar .sidebar-footer {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    #hub-sidebar #account-chevron-icon {
+        display: block !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    #hub-sidebar #hub-account-trigger {
+        justify-content: space-between !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+        opacity: 1 !important;
+    }
+
+    #hub-sidebar #sidebar-toggle-btn {
+        display: none !important;
+    }
+}
+
+
 

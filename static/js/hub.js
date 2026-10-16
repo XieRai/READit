@@ -38,6 +38,7 @@ function initAccountState() {
 
 function updateAccountUI() {
     const avatar = document.getElementById('account-avatar-circle');
+    const mobileAvatar = document.getElementById('mobile-top-avatar');
     const nameLabel = document.getElementById('account-name-label');
     const planLabel = document.getElementById('account-plan-label');
     const chevron = document.getElementById('account-chevron-icon');
@@ -47,6 +48,10 @@ function updateAccountUI() {
         if (avatar) {
             avatar.className = "w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 border border-white/20 flex items-center justify-center text-xs text-white font-bold shrink-0";
             avatar.textContent = (currentUser.name || 'U').charAt(0).toUpperCase();
+        }
+        if (mobileAvatar) {
+            mobileAvatar.className = "w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 border border-white/20 flex items-center justify-center text-xs text-white font-bold shrink-0";
+            mobileAvatar.textContent = (currentUser.name || 'U').charAt(0).toUpperCase();
         }
         if (nameLabel) nameLabel.textContent = currentUser.name || 'Nama Akun';
         if (planLabel) planLabel.textContent = currentUser.plan || 'Free plan';
@@ -59,6 +64,10 @@ function updateAccountUI() {
             avatar.className = "w-7 h-7 rounded-full bg-[#333333] border border-white/10 flex items-center justify-center text-xs text-white/70 font-semibold shrink-0";
             avatar.innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
         }
+        if (mobileAvatar) {
+            mobileAvatar.className = "w-8 h-8 rounded-full bg-[#333333] border border-white/10 flex items-center justify-center text-xs text-white/70 font-semibold transition-colors";
+            mobileAvatar.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+        }
         if (nameLabel) nameLabel.textContent = 'Sign in';
         if (planLabel) planLabel.textContent = 'Click to access account';
         if (chevron) {
@@ -70,9 +79,45 @@ function updateAccountUI() {
     }
 }
 
+let isMobileSidebarOpen = false;
+
+function toggleMobileSidebar(openState) {
+    const sidebar = document.getElementById('hub-sidebar');
+    const backdrop = document.getElementById('hub-mobile-sidebar-backdrop');
+    if (!sidebar) return;
+
+    if (openState === undefined) {
+        isMobileSidebarOpen = !isMobileSidebarOpen;
+    } else {
+        isMobileSidebarOpen = !!openState;
+    }
+
+    if (isMobileSidebarOpen) {
+        // Strip collapsed state on mobile so all button text and labels are 100% visible
+        sidebar.classList.remove('sidebar-collapsed');
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+        if (backdrop) {
+            backdrop.classList.remove('hidden', 'pointer-events-none');
+            requestAnimationFrame(() => {
+                backdrop.classList.add('opacity-100');
+            });
+        }
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        sidebar.classList.remove('translate-x-0');
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100');
+            setTimeout(() => {
+                backdrop.classList.add('hidden', 'pointer-events-none');
+            }, 300);
+        }
+    }
+}
+
 function handleAccountTriggerClick() {
-    // If the sidebar is collapsed/shrinked, unable to tap on the profile icon
-    if (isSidebarMinimized) {
+    // If the sidebar is collapsed/shrinked on desktop, unable to tap on the profile icon
+    if (isSidebarMinimized && window.innerWidth >= 768) {
         return;
     }
     if (!isLoggedIn) {
@@ -105,15 +150,26 @@ function toggleAccountMenu() {
 // =====================================================================
 function initSidebarState() {
     const saved = localStorage.getItem('readit_sidebar_collapsed');
-    if (saved === 'true') {
+    // Only apply collapsed state on desktop viewports (>= 768px)
+    if (saved === 'true' && window.innerWidth >= 768) {
         isSidebarMinimized = true;
         const sidebar = document.getElementById('hub-sidebar');
         if (sidebar) sidebar.classList.add('sidebar-collapsed');
+    } else {
+        isSidebarMinimized = false;
+        const sidebar = document.getElementById('hub-sidebar');
+        if (sidebar) sidebar.classList.remove('sidebar-collapsed');
     }
     updateSidebarToggleTooltip();
 }
 
 function toggleSidebarMinimize() {
+    // On mobile viewports (< 768px), closing or toggling hides the mobile drawer instead
+    if (window.innerWidth < 768) {
+        toggleMobileSidebar(false);
+        return;
+    }
+
     isSidebarMinimized = !isSidebarMinimized;
     const sidebar = document.getElementById('hub-sidebar');
     if (sidebar) {
@@ -136,6 +192,23 @@ function updateSidebarToggleTooltip() {
         btn.title = isSidebarMinimized ? 'Expand sidebar (Ctrl+B)' : 'Minimize sidebar (Ctrl+B)';
     }
 }
+
+// Listen to screen resize to ensure mobile sidebar always has full text
+window.addEventListener('resize', () => {
+    const sidebar = document.getElementById('hub-sidebar');
+    if (!sidebar) return;
+    if (window.innerWidth < 768) {
+        sidebar.classList.remove('sidebar-collapsed');
+    } else {
+        const saved = localStorage.getItem('readit_sidebar_collapsed');
+        if (saved === 'true') {
+            isSidebarMinimized = true;
+            sidebar.classList.add('sidebar-collapsed');
+        }
+        toggleMobileSidebar(false);
+    }
+    updateSidebarToggleTooltip();
+});
 
 // =====================================================================
 // AUTH MODAL: SMOOTH FROSTED BACKDROP & SLIDING LOGIN / SIGN UP CARDS
@@ -385,44 +458,44 @@ function renderHubDocuments() {
     if (!listContainer) return;
 
     listContainer.innerHTML = hubDocuments.map((doc) => `
-        <div class="flex flex-col items-center group cursor-pointer" onclick="openSmartReader('${doc.title.replace(/'/g, "\\'")}')">
-            <!-- Miniature Paper Thumbnail -->
-            <div class="w-[175px] h-[225px] rounded-[14px] bg-white p-3.5 text-[#111827] shadow-md border border-transparent group-hover:ring-2 group-hover:ring-readitGreen transition overflow-hidden flex flex-col justify-between select-none">
+        <div class="flex flex-col items-center w-full group cursor-pointer touch-manipulation" onclick="openSmartReader('${doc.title.replace(/'/g, "\\'")}')">
+            <!-- Miniature Paper Thumbnail (Aspect 175/225 responsive, touch target >= 44x44px) -->
+            <div class="w-full aspect-[175/225] min-h-[190px] sm:min-h-[225px] rounded-[14px] bg-white p-3 sm:p-3.5 text-[#111827] shadow-md border border-transparent group-hover:ring-2 group-hover:ring-readitGreen active:scale-[0.98] transition-all overflow-hidden flex flex-col justify-between select-none">
                 <div>
                     <!-- Miniature Journal Header -->
-                    <div class="flex items-start justify-between border-b border-neutral-800 pb-1.5 mb-1.5">
+                    <div class="flex items-start justify-between border-b border-neutral-800 pb-1 sm:pb-1.5 mb-1 sm:mb-1.5">
                         <div class="flex items-center gap-1">
-                            <div class="w-3.5 h-3.5 rounded-full border border-[#0284C7] flex items-center justify-center text-[3.8px] font-bold text-[#0284C7]">PDF</div>
-                            <div class="text-[4.3px] italic text-[#0284C7] leading-tight font-serifPaper">
+                            <div class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-[#0284C7] flex items-center justify-center text-[3.8px] sm:text-[4.5px] font-bold text-[#0284C7]">PDF</div>
+                            <div class="text-[4.3px] sm:text-[5px] italic text-[#0284C7] leading-tight font-serifPaper">
                                 <div>Academic Research</div>
                                 <div>Manuscript</div>
                             </div>
                         </div>
-                        <div class="text-[3.6px] text-neutral-700 leading-tight text-right font-serifPaper">
+                        <div class="text-[3.6px] sm:text-[4.5px] text-neutral-700 leading-tight text-right font-serifPaper">
                             <div>${doc.pageCount || 1} Pages</div>
                             <div>READit Hub</div>
                         </div>
                     </div>
 
                     <!-- Miniature Paper Title -->
-                    <div class="text-[4px] italic text-neutral-600 mb-0.5 font-serifPaper">Research Article</div>
-                    <div class="text-[6px] font-bold text-black leading-[1.2] mb-1 font-serifPaper line-clamp-2">
+                    <div class="text-[4px] sm:text-[5px] italic text-neutral-600 mb-0.5 font-serifPaper">Research Article</div>
+                    <div class="text-[6.5px] sm:text-[7.5px] font-bold text-black leading-[1.2] mb-1 font-serifPaper line-clamp-2">
                         ${doc.fullTitle || doc.title}
                     </div>
 
                     <!-- Miniature Abstract Block -->
-                    <div class="text-[4px] text-neutral-800 leading-[1.34] text-justify font-serifPaper line-clamp-6">
+                    <div class="text-[4.2px] sm:text-[5.2px] text-neutral-800 leading-[1.34] text-justify font-serifPaper line-clamp-5 sm:line-clamp-6">
                         <strong>Preview:</strong> ${doc.sentences && doc.sentences[0] ? doc.sentences[0].orig.replace(/^"|"$/g, '') : 'Interactive academic manuscript prepared for sentence-by-sentence analysis.'}
                     </div>
                 </div>
 
-                <div class="border-t border-neutral-800 pt-1 text-[3.7px] text-neutral-700 font-serifPaper truncate">
+                <div class="border-t border-neutral-800 pt-1 text-[3.8px] sm:text-[4.8px] text-neutral-700 font-serifPaper truncate">
                     <strong>Format:</strong> PDF • Multi-tab Reader Enabled
                 </div>
             </div>
 
             <!-- Centered Document Label underneath -->
-            <span class="mt-2.5 text-[11px] font-semibold text-white tracking-wide max-w-[170px] truncate text-center">
+            <span class="mt-2.5 text-[11px] sm:text-xs font-semibold text-white tracking-wide w-full max-w-[170px] truncate text-center px-1">
                 ${doc.title}
             </span>
         </div>
@@ -693,8 +766,92 @@ function translateToBahasa(sentence) {
 // MULTI-TAB READING SYSTEM & DRAG-AND-DROP TAB REORDERING
 // =====================================================================
 let draggedTabId = null;
+let isPaperSwitcherDrawerOpen = false;
+
+function togglePaperSwitcherDrawer(openState) {
+    const drawer = document.getElementById('reader-paper-switcher-drawer');
+    const backdrop = document.getElementById('reader-drawer-backdrop');
+    const chevron = document.getElementById('mobile-switcher-chevron');
+    if (!drawer) return;
+
+    if (openState === undefined) {
+        isPaperSwitcherDrawerOpen = !isPaperSwitcherDrawerOpen;
+    } else {
+        isPaperSwitcherDrawerOpen = !!openState;
+    }
+
+    if (isPaperSwitcherDrawerOpen) {
+        drawer.classList.add('open');
+        if (backdrop) {
+            backdrop.classList.remove('hidden', 'pointer-events-none');
+            requestAnimationFrame(() => {
+                backdrop.classList.add('opacity-100');
+            });
+        }
+        if (chevron) {
+            chevron.style.transform = 'rotate(180deg)';
+        }
+        renderDrawerPapersList();
+    } else {
+        drawer.classList.remove('open');
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100');
+            setTimeout(() => {
+                backdrop.classList.add('hidden', 'pointer-events-none');
+            }, 200);
+        }
+        if (chevron) {
+            chevron.style.transform = 'rotate(0deg)';
+        }
+    }
+}
+
+function renderDrawerPapersList() {
+    const container = document.getElementById('drawer-papers-list');
+    if (!container) return;
+
+    container.innerHTML = openTabs.map((tab) => {
+        const isActive = tab.id === activeTabId;
+        return `
+            <div class="flex items-center justify-between p-2.5 rounded-xl ${isActive ? 'bg-white/[0.12] border-readitGreen/60' : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'} border min-h-[48px] transition-all">
+                <button onclick="switchReaderTab('${tab.id}'); togglePaperSwitcherDrawer(false);" 
+                        class="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[44px] focus:outline-none touch-manipulation">
+                    <span class="w-2.5 h-2.5 rounded-full ${isActive ? 'bg-readitGreen shadow-[0_0_8px_rgba(118,184,67,0.8)]' : 'bg-white/30'} shrink-0"></span>
+                    <div class="truncate">
+                        <div class="text-xs font-semibold ${isActive ? 'text-white' : 'text-white/80'} truncate">${tab.title}</div>
+                        <div class="text-[10px] text-white/50">${tab.pageCount || 1} Pages • ${tab.isDemo ? 'Interactive Demo' : 'PDF Document'}</div>
+                    </div>
+                </button>
+                <button onclick="closeReaderTab(event, '${tab.id}')" 
+                        class="min-w-[44px] min-h-[44px] flex items-center justify-center text-white/40 hover:text-white rounded-lg active:bg-white/10 transition focus:outline-none touch-manipulation" 
+                        title="Close paper">
+                    ✕
+                </button>
+            </div>
+        `;
+    }).join('');
+}
 
 function renderReaderTabs() {
+    const activeTab = openTabs.find(t => t.id === activeTabId) || openTabs[0];
+
+    // Synchronize Mobile Paper Switcher Button display
+    const mobileTitle = document.getElementById('mobile-active-paper-title');
+    if (mobileTitle && activeTab) {
+        mobileTitle.textContent = activeTab.title;
+    }
+    const mobileCount = document.getElementById('mobile-tab-count-badge');
+    if (mobileCount) {
+        mobileCount.textContent = openTabs.length;
+    }
+    const drawerCounter = document.getElementById('drawer-paper-counter');
+    if (drawerCounter) {
+        drawerCounter.textContent = `${openTabs.length} paper${openTabs.length === 1 ? '' : 's'} open`;
+    }
+
+    // Always keep drawer list up-to-date
+    renderDrawerPapersList();
+
     const tabsBar = document.getElementById('reader-tabs-bar');
     if (!tabsBar) return;
 
@@ -830,8 +987,12 @@ function navigateNextTab(backward = false) {
 }
 
 function switchReaderTab(tabId) {
-    if (activeTabId === tabId) return;
+    if (activeTabId === tabId) {
+        togglePaperSwitcherDrawer(false);
+        return;
+    }
     activeTabId = tabId;
+    togglePaperSwitcherDrawer(false);
     renderReaderTabs();
     renderActiveTabDocument();
 }
@@ -876,14 +1037,18 @@ function openDocumentInTab(doc) {
 
     const dashView = document.getElementById('hub-dashboard-view');
     const readerView = document.getElementById('hub-reader-view');
+    const mobileHeader = document.getElementById('hub-mobile-header');
     if (dashView) dashView.classList.add('hidden');
+    if (mobileHeader) mobileHeader.classList.add('hidden');
     if (readerView) {
         readerView.classList.remove('hidden');
         readerView.classList.add('flex');
     }
 
+    togglePaperSwitcherDrawer(false);
     renderReaderTabs();
     renderActiveTabDocument();
+    setReaderLang(currentReaderLang);
 }
 
 function openSmartReader(docTitle) {
@@ -904,12 +1069,16 @@ function openSmartReader(docTitle) {
 function closeSmartReader() {
     const readerView = document.getElementById('hub-reader-view');
     const dashView = document.getElementById('hub-dashboard-view');
+    const mobileHeader = document.getElementById('hub-mobile-header');
+
+    togglePaperSwitcherDrawer(false);
 
     if (readerView) {
         readerView.classList.add('hidden');
         readerView.classList.remove('flex');
     }
     if (dashView) dashView.classList.remove('hidden');
+    if (mobileHeader) mobileHeader.classList.remove('hidden');
 }
 
 // =====================================================================
@@ -1121,6 +1290,8 @@ function selectReaderSentence(idx) {
 
 function setReaderLang(lang) {
     currentReaderLang = lang;
+
+    // Synchronize Desktop Top Bar language buttons
     const btnEn = document.getElementById('reader-lang-en');
     const btnId = document.getElementById('reader-lang-id');
     if (btnEn && btnId) {
@@ -1132,6 +1303,20 @@ function setReaderLang(lang) {
             btnEn.className = "px-3 py-1 rounded-full text-white/60 hover:text-white transition";
         }
     }
+
+    // Synchronize Sleek Floating Bottom Action Bar buttons (>= 44x44px touch targets)
+    const floatEn = document.getElementById('floating-lang-en');
+    const floatId = document.getElementById('floating-lang-id');
+    if (floatEn && floatId) {
+        if (lang === 'en') {
+            floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
+            floatId.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation";
+        } else {
+            floatId.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
+            floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation";
+        }
+    }
+
     const tab = openTabs.find(t => t.id === activeTabId);
     selectReaderSentence(tab ? tab.activeSentenceIdx || 0 : 0);
 }

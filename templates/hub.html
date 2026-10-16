@@ -43,29 +43,42 @@
         <p class="text-xs text-white/70 font-monoFeature">PDF format only • Maximum 20MB per file</p>
     </div>
 
+    <!-- Mobile Sidebar Backdrop (Tap outside to close sidebar on mobile) -->
+    <div id="hub-mobile-sidebar-backdrop" onclick="toggleMobileSidebar(false)" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm hidden md:hidden transition-opacity duration-300 opacity-0 pointer-events-none"></div>
+
     <!-- ========================================================================= -->
-    <!-- LEFT SIDEBAR (w-[240px] collapsible to 68px, #1B1B1B, 100vh)              -->
+    <!-- LEFT SIDEBAR (Mobile Off-Canvas / Desktop Collapsible 240px <-> 68px)       -->
     <!-- ========================================================================= -->
-    <aside id="hub-sidebar" class="w-[240px] h-screen bg-hubSidebar border-r border-white/[0.08] flex flex-col justify-between shrink-0 z-20 relative">
+    <aside id="hub-sidebar" class="fixed inset-y-0 left-0 z-50 transform -translate-x-full md:relative md:inset-auto md:translate-x-0 w-[260px] md:w-[240px] h-screen bg-hubSidebar border-r border-white/[0.08] flex flex-col justify-between shrink-0 transition-transform duration-300 md:transition-[width]">
         
         <!-- Top Brand Logo, Minimize Toggle & Navigation Pills -->
         <div>
-            <!-- Top Header (h-[76px]) with Brand Logo & Minimize Button -->
+            <!-- Top Header (h-[76px]) with Brand Logo & Minimize/Close Button -->
             <div class="h-[76px] border-b border-white/[0.08] flex items-center justify-between px-5 sidebar-header relative">
                 <a href="/" class="group flex items-center gap-2.5 focus:outline-none overflow-hidden" title="Return to READit Landing Page">
                     <img src="/assets/image/readit_icon.png" alt="READit" class="h-9 w-auto object-contain hover:scale-105 transition-transform shrink-0">
                     <span class="sidebar-label font-bold text-sm tracking-wide text-white group-hover:text-readitGreen transition-colors truncate">READit</span>
                 </a>
-                <button onclick="toggleSidebarMinimize()" id="sidebar-toggle-btn" class="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.12] text-white/60 hover:text-white transition focus:outline-none shrink-0" title="Toggle Sidebar (Ctrl+B)">
-                    <svg id="sidebar-toggle-icon" class="w-4 h-4 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                </button>
+                <div class="flex items-center gap-1.5">
+                    <!-- Mobile Close Button (Visible on < md) -->
+                    <button onclick="toggleMobileSidebar(false)" class="md:hidden p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.12] text-white/70 hover:text-white transition focus:outline-none min-w-[40px] min-h-[40px] flex items-center justify-center touch-manipulation" title="Close sidebar" aria-label="Close sidebar">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <!-- Desktop Minimize Toggle Button (Visible on >= md) -->
+                    <button onclick="toggleSidebarMinimize()" id="sidebar-toggle-btn" class="hidden md:flex p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.12] text-white/60 hover:text-white transition focus:outline-none shrink-0" title="Toggle Sidebar (Ctrl+B)">
+                        <svg id="sidebar-toggle-icon" class="w-4 h-4 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Navigation Pills (My Docs, Shared Docs, Resources) with Icons & Labels -->
-            <nav class="sidebar-nav-container px-5 py-7 space-y-3">
-                <button onclick="switchHubTab('my-docs')" id="hub-nav-my-docs" class="sidebar-nav-btn w-full py-2 px-3.5 rounded-full text-[13px] font-normal border border-white/70 text-white bg-white/[0.03] transition flex items-center gap-3 focus:outline-none" title="My Docs">
+            <nav class="sidebar-nav-container px-4 sm:px-5 py-6 sm:py-7 space-y-3">
+                <button onclick="switchHubTab('my-docs')" id="hub-nav-my-docs" class="sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-medium border border-white/70 text-white bg-white/[0.05] transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation" title="My Docs">
                     <svg class="w-4 h-4 shrink-0 text-readitGreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <polyline points="14 2 14 8 20 8"></polyline>
@@ -73,23 +86,23 @@
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                         <polyline points="10 9 9 9 8 9"></polyline>
                     </svg>
-                    <span class="sidebar-label truncate">My Docs</span>
+                    <span class="sidebar-label font-medium truncate">My Docs</span>
                 </button>
-                <button onclick="switchHubTab('shared-docs')" id="hub-nav-shared-docs" class="sidebar-nav-btn w-full py-2 px-3.5 rounded-full text-[13px] font-normal border border-white/[0.12] text-white/40 hover:text-white/80 hover:border-white/30 transition flex items-center gap-3 focus:outline-none" title="Shared Docs">
+                <button onclick="switchHubTab('shared-docs')" id="hub-nav-shared-docs" class="sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-medium border border-white/[0.12] text-white/50 hover:text-white/90 hover:border-white/30 transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation" title="Shared Docs">
                     <svg class="w-4 h-4 shrink-0 text-white/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                         <circle cx="9" cy="7" r="4"></circle>
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                         <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
-                    <span class="sidebar-label truncate">Shared Docs</span>
+                    <span class="sidebar-label font-medium truncate">Shared Docs</span>
                 </button>
-                <button onclick="switchHubTab('resources')" id="hub-nav-resources" class="sidebar-nav-btn w-full py-2 px-3.5 rounded-full text-[13px] font-normal border border-white/[0.12] text-white/40 hover:text-white/80 hover:border-white/30 transition flex items-center gap-3 focus:outline-none" title="Resources">
+                <button onclick="switchHubTab('resources')" id="hub-nav-resources" class="sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-medium border border-white/[0.12] text-white/50 hover:text-white/90 hover:border-white/30 transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation" title="Resources">
                     <svg class="w-4 h-4 shrink-0 text-white/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                     </svg>
-                    <span class="sidebar-label truncate">Resources</span>
+                    <span class="sidebar-label font-medium truncate">Resources</span>
                 </button>
             </nav>
         </div>
@@ -145,22 +158,45 @@
     <!-- ========================================================================= -->
     <!-- RIGHT MAIN WORKSPACE CANVAS (flex-1, #202020, scrollable)                 -->
     <!-- ========================================================================= -->
-    <main class="flex-1 h-screen overflow-y-auto bg-hubCanvas relative">
+    <main class="flex-1 h-screen overflow-y-auto bg-hubCanvas relative flex flex-col">
         
+        <!-- Mobile Top Header Bar (Visible on < md in Dashboard View) -->
+        <div id="hub-mobile-header" class="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/[0.08] bg-hubSidebar shrink-0 z-10 sticky top-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleMobileSidebar(true)" class="min-w-[44px] min-h-[44px] -ml-2 rounded-xl flex items-center justify-center text-white/80 hover:text-white hover:bg-white/[0.08] active:bg-white/[0.14] transition touch-manipulation focus:outline-none" aria-label="Open navigation menu">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+                <a href="/" class="flex items-center gap-2" title="READit">
+                    <img src="/assets/image/readit_icon.png" alt="READit" class="h-7 w-auto object-contain">
+                    <span class="font-bold text-sm tracking-wide text-white">READit</span>
+                </a>
+            </div>
+            <button onclick="handleAccountTriggerClick()" class="min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center rounded-full hover:bg-white/[0.08] transition touch-manipulation focus:outline-none" aria-label="Account options">
+                <div id="mobile-top-avatar" class="w-8 h-8 rounded-full bg-[#333333] border border-white/10 flex items-center justify-center text-xs text-white/70 font-semibold transition-colors">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+            </button>
+        </div>
+
         <!-- VIEW A: DOCUMENT HUB DASHBOARD -->
-        <div id="hub-dashboard-view" class="px-10 sm:px-16 lg:px-24 py-14 max-w-[1280px]">
+        <div id="hub-dashboard-view" class="px-4 sm:px-10 lg:px-20 py-6 sm:py-12 max-w-[1280px] w-full mx-auto">
             
             <!-- SECTION 1: Guides and Tutorial -->
             <section id="hub-guides-section">
-                <h2 class="text-[15px] font-semibold text-white tracking-wide mb-4">
+                <h2 class="text-sm sm:text-[15px] font-semibold text-white tracking-wide mb-3 sm:mb-4">
                     Guides and Tutorial
                 </h2>
 
                 <!-- 4 Minimalist Rounded Video Boxes (#232323, subtle border) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-[920px]">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 max-w-[920px]">
                     
                     <!-- Video Guide Card 1 -->
-                    <button onclick="openGuideVideoModal(0)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                    <button onclick="openGuideVideoModal(0)" class="group min-h-[44px] h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none touch-manipulation">
                         <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">01 · Hover &amp; Click</span>
                         <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                             <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
@@ -171,7 +207,7 @@
                     </button>
 
                     <!-- Video Guide Card 2 -->
-                    <button onclick="openGuideVideoModal(1)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                    <button onclick="openGuideVideoModal(1)" class="group min-h-[44px] h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none touch-manipulation">
                         <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">02 · Translating Idea</span>
                         <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                             <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
@@ -182,7 +218,7 @@
                     </button>
 
                     <!-- Video Guide Card 3 -->
-                    <button onclick="openGuideVideoModal(2)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                    <button onclick="openGuideVideoModal(2)" class="group min-h-[44px] h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none touch-manipulation">
                         <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">03 · Quick Reference</span>
                         <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                             <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
@@ -193,7 +229,7 @@
                     </button>
 
                     <!-- Video Guide Card 4 -->
-                    <button onclick="openGuideVideoModal(3)" class="group h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none">
+                    <button onclick="openGuideVideoModal(3)" class="group min-h-[44px] h-[138px] rounded-[16px] bg-hubCard border border-white/[0.07] hover:border-white/20 transition-all relative flex items-center justify-center p-4 text-left overflow-hidden focus:outline-none touch-manipulation">
                         <span class="absolute top-3 left-3.5 text-[10px] font-monoFeature text-white/0 group-hover:text-white/45 transition-all">04 · Easy Citation</span>
                         <div class="w-9 h-9 rounded-full bg-white/[0.02] group-hover:bg-white/[0.09] border border-white/[0.05] group-hover:border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                             <svg class="w-3.5 h-3.5 text-white translate-x-[0.5px]" viewBox="0 0 24 24" fill="currentColor">
@@ -207,36 +243,38 @@
             </section>
 
             <!-- SECTION 2: Recent Document ▼ -->
-            <section class="mt-12">
-                <div class="flex items-center gap-2 mb-5">
-                    <button onclick="toggleRecentDocumentsGrid()" class="inline-flex items-center gap-2.5 text-[15px] font-semibold text-white hover:text-white/85 focus:outline-none">
+            <section class="mt-8 sm:mt-12">
+                <div class="flex items-center gap-2 mb-4 sm:mb-5">
+                    <button onclick="toggleRecentDocumentsGrid()" class="inline-flex items-center gap-2.5 text-sm sm:text-[15px] font-semibold text-white hover:text-white/85 focus:outline-none min-h-[44px] touch-manipulation">
                         <span id="hub-section-heading">Recent Document</span>
                         <span id="recent-dropdown-triangle" class="text-[11px] text-white transition-transform duration-200">▼</span>
                     </button>
                 </div>
 
-                <!-- Document Grid: Slot 1 is ALWAYS "+ New File" Upload Card, Slot 2 is "Demo File" -->
-                <div id="hub-documents-grid" class="flex flex-wrap items-start gap-8 transition-opacity duration-200">
+                <!-- Document Grid: Responsive 2-column grid on mobile (grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5) -->
+                <div id="hub-documents-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6 transition-opacity duration-200">
                     
-                    <!-- SLOT 1 (ALWAYS FIRST / LOCKED TOP-LEFT): "+ New File" Upload Card -->
-                    <div class="flex flex-col items-center">
+                    <!-- SLOT 1 (ALWAYS FIRST / LOCKED TOP-LEFT): "+ New File" Upload Card (Touch target >= 44x44px) -->
+                    <div class="flex flex-col items-center w-full">
                         <button onclick="triggerNewFilePicker()" 
                                 ondragover="handleDragOver(event)" 
                                 ondragleave="handleDragLeave(event)" 
                                 ondrop="handleFileDrop(event)"
                                 id="new-file-dropcard"
                                 title="Click or drop a PDF file to upload (< 20MB)"
-                                class="upload-card-interactive w-[175px] h-[225px] rounded-[14px] bg-hubCard flex flex-col items-center justify-center group focus:outline-none p-4">
-                            <!-- Centered Thin Crosshair '+' Icon -->
-                            <svg class="w-10 h-10 text-white/25 group-hover:text-white/75 transition-colors stroke-[1.2] mb-1.5" viewBox="0 0 48 48" fill="none" stroke="currentColor">
-                                <line x1="24" y1="10" x2="24" y2="38"></line>
-                                <line x1="10" y1="24" x2="38" y2="24"></line>
-                            </svg>
-                            <span class="text-[10px] text-white/35 font-monoFeature group-hover:text-white/60 transition-colors">
+                                class="upload-card-interactive w-full aspect-[175/225] min-h-[190px] sm:min-h-[225px] rounded-[14px] bg-hubCard flex flex-col items-center justify-center group focus:outline-none p-3.5 sm:p-4 cursor-pointer touch-manipulation">
+                            <!-- Centered Thin Crosshair '+' Icon with >= 44x44px touch area -->
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-1 transition-colors">
+                                <svg class="w-9 h-9 sm:w-10 sm:h-10 text-white/30 group-hover:text-white/80 group-active:text-readitGreen transition-colors stroke-[1.2]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
+                                    <line x1="24" y1="10" x2="24" y2="38"></line>
+                                    <line x1="10" y1="24" x2="38" y2="24"></line>
+                                </svg>
+                            </div>
+                            <span class="text-[10px] sm:text-[11px] text-white/40 font-monoFeature group-hover:text-white/70 transition-colors text-center px-1">
                                 PDF &lt; 20MB
                             </span>
                         </button>
-                        <span class="mt-2.5 text-[11px] font-semibold text-white tracking-wide">
+                        <span class="mt-2.5 text-[11px] sm:text-xs font-semibold text-white tracking-wide text-center">
                             New File
                         </span>
                     </div>
@@ -252,25 +290,45 @@
         <!-- ===================================================================== -->
         <!-- VIEW B: INTERACTIVE SMART SENTENCE READER WORKSPACE WITH MULTI-TABS   -->
         <!-- ===================================================================== -->
-        <div id="hub-reader-view" class="hidden flex-col h-screen w-full bg-[#181818] overflow-hidden">
+        <!-- ===================================================================== -->
+        <!-- VIEW B: INTERACTIVE SMART SENTENCE READER WORKSPACE WITH MULTI-TABS   -->
+        <!-- ===================================================================== -->
+        <div id="hub-reader-view" class="hidden flex-col h-screen w-full bg-[#181818] overflow-hidden relative">
             
-            <!-- Reader Top Bar with Multi-Tab System -->
-            <div class="h-14 border-b border-white/[0.08] bg-hubSidebar px-4 sm:px-6 flex items-center justify-between shrink-0 gap-3">
-                <div class="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                    <button onclick="closeSmartReader()" class="inline-flex items-center gap-1.5 text-xs font-medium text-white/70 hover:text-white transition px-3 py-1.5 rounded-full border border-white/15 hover:border-white/35 shrink-0" title="Return to Document Hub">
+            <!-- Reader Top Bar with Multi-Tab System & Mobile Collapsible Switcher -->
+            <div class="h-14 border-b border-white/[0.08] bg-hubSidebar px-3 sm:px-6 flex items-center justify-between shrink-0 gap-2 sm:gap-3 z-30 relative">
+                <div class="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 overflow-hidden">
+                    <button onclick="closeSmartReader()" class="inline-flex items-center gap-1.5 text-xs font-medium text-white/70 hover:text-white transition px-3 py-2 rounded-full border border-white/15 hover:border-white/35 shrink-0 min-h-[44px] touch-manipulation focus:outline-none" title="Return to Document Hub">
                         <span>←</span>
                         <span class="hidden sm:inline">Hub</span>
                     </button>
 
                     <span class="h-5 w-[1px] bg-white/10 shrink-0"></span>
 
-                    <!-- Multi-Tab System Container -->
-                    <div id="reader-tabs-bar" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 flex-1">
+                    <!-- Mobile Collapsible Paper Switcher Trigger Button (Visible only on < md, touch target >= 44x44px) -->
+                    <button onclick="togglePaperSwitcherDrawer()" 
+                            id="mobile-paper-switcher-btn" 
+                            class="flex md:hidden items-center justify-between gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.18] border border-white/15 text-white transition max-w-[210px] min-h-[44px] focus:outline-none touch-manipulation" 
+                            title="Open paper switcher drawer">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-2 h-2 rounded-full bg-readitGreen shrink-0"></span>
+                            <span id="mobile-active-paper-title" class="text-xs font-medium text-white truncate">Demo File</span>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <span id="mobile-tab-count-badge" class="px-1.5 py-0.5 rounded-full bg-white/10 text-[10px] font-monoFeature text-white/70">1</span>
+                            <svg id="mobile-switcher-chevron" class="w-3.5 h-3.5 text-white/60 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                    </button>
+
+                    <!-- Desktop Multi-Tab System Container (Hidden on mobile < md) -->
+                    <div id="reader-tabs-bar" class="hidden md:flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 flex-1">
                         <!-- Dynamic tabs rendered by JS -->
                     </div>
 
-                    <!-- New Tab / Open File Button in Tab Bar -->
-                    <button onclick="triggerNewFilePicker()" class="w-7 h-7 rounded-lg bg-white/[0.05] hover:bg-white/[0.15] text-white/70 hover:text-white flex items-center justify-center text-sm font-bold shrink-0 transition" title="Open or Upload Another PDF (&lt;20MB)">
+                    <!-- New Tab / Open File Button in Tab Bar (>= 44x44px on mobile) -->
+                    <button onclick="triggerNewFilePicker()" class="w-9 h-9 md:w-7 md:h-7 rounded-lg bg-white/[0.05] hover:bg-white/[0.15] text-white/70 hover:text-white flex items-center justify-center text-sm font-bold shrink-0 transition min-w-[40px] min-h-[40px] md:min-w-0 md:min-h-0 touch-manipulation focus:outline-none" title="Open or Upload Another PDF (<20MB)">
                         +
                     </button>
                 </div>
@@ -282,16 +340,48 @@
                     <span class="hidden lg:inline-block text-[11px] text-white/45">
                         Hover sentence to highlight • Click for inline guide
                     </span>
-                    <div class="flex items-center bg-[#252525] border border-white/10 rounded-full p-0.5 text-[11px]">
+                    <!-- Desktop Top Language Toggle (Synchronized with floating bottom bar) -->
+                    <div class="hidden md:flex items-center bg-[#252525] border border-white/10 rounded-full p-0.5 text-[11px]">
                         <button onclick="setReaderLang('en')" id="reader-lang-en" class="px-3 py-1 rounded-full bg-readitGreen text-black font-semibold transition">Simple EN</button>
                         <button onclick="setReaderLang('id')" id="reader-lang-id" class="px-3 py-1 rounded-full text-white/60 hover:text-white transition">Bahasa ID</button>
                     </div>
                 </div>
             </div>
 
+            <!-- Backdrop for Mobile Paper Switcher Drawer -->
+            <div id="reader-drawer-backdrop" onclick="togglePaperSwitcherDrawer(false)" class="fixed inset-0 z-20 bg-black/60 backdrop-blur-xs hidden md:hidden transition-opacity duration-200 opacity-0 pointer-events-none"></div>
+
+            <!-- Collapsible Paper Switcher Drawer (Mobile Viewport) -->
+            <div id="reader-paper-switcher-drawer" class="paper-switcher-drawer fixed md:hidden top-14 left-0 right-0 z-30 bg-[#1D1D1D]/98 backdrop-blur-2xl border-b border-white/15 shadow-2xl transition-all duration-300 overflow-hidden max-h-0 opacity-0 pointer-events-none">
+                <div class="p-4 space-y-3 max-w-lg mx-auto">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="text-xs font-monoFeature uppercase tracking-wider text-white/50">Open Documents</span>
+                        <span class="text-[11px] text-white/40 font-monoFeature" id="drawer-paper-counter">1 paper open</span>
+                    </div>
+                    
+                    <!-- Dynamic List of Open Papers (Each item has >=44px touch target) -->
+                    <div id="drawer-papers-list" class="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+
+                    <!-- Drawer Action: Add / Upload New PDF -->
+                    <div class="pt-2 border-t border-white/10">
+                        <button onclick="triggerNewFilePicker(); togglePaperSwitcherDrawer(false);" 
+                                class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.18] border border-white/15 text-white text-xs font-medium min-h-[44px] transition touch-manipulation focus:outline-none">
+                            <svg class="w-4 h-4 text-readitGreen" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span>Upload Another PDF (&lt; 20MB)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Scrollable Paper Canvas with Whole-Sentence Hover & Click Guide -->
-            <div class="flex-1 overflow-y-auto p-6 sm:p-10 flex justify-center bg-hubCanvas">
-                <div id="reader-paper-sheet" class="academic-paper-sheet w-full max-w-[820px] rounded-xl p-8 sm:p-12 font-serifPaper text-[#111827] leading-[1.78] h-fit select-text">
+            <!-- pb-36 sm:pb-44 ensures floating bottom action bar NEVER blocks paper content! -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-8 md:p-10 pb-36 sm:pb-44 flex justify-center bg-hubCanvas">
+                <div id="reader-paper-sheet" class="academic-paper-sheet w-full max-w-[820px] rounded-xl p-5 sm:p-8 md:p-12 font-serifPaper text-[#111827] leading-[1.78] h-fit select-text">
                     
                     <!-- Journal Top Header -->
                     <div class="flex flex-col sm:flex-row sm:items-start justify-between pb-4 mb-5 border-b-2 border-neutral-800 gap-4">
@@ -414,6 +504,30 @@
                         </div>
                     </div>
 
+                </div>
+            </div>
+
+            <!-- Sleek Floating Bottom Language Action Bar (EN / ID) -->
+            <!-- Positioned fixed bottom, elevated, guaranteed never blocking paper content due to pb-36 sm:pb-44 on scrollable canvas -->
+            <div id="reader-floating-action-bar" class="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 pointer-events-auto">
+                <div class="flex items-center gap-1.5 p-1.5 rounded-full bg-[#1A1A1A]/95 backdrop-blur-xl border border-white/15 shadow-2xl shadow-black/80">
+                    <button onclick="setReaderLang('en')" 
+                            id="floating-lang-en" 
+                            class="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation" 
+                            aria-label="Switch to Simple English">
+                        <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
+                        <span>Simple EN</span>
+                    </button>
+                    <button onclick="setReaderLang('id')" 
+                            id="floating-lang-id" 
+                            class="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation" 
+                            aria-label="Switch to Bahasa Indonesia">
+                        <span>Bahasa ID</span>
+                    </button>
                 </div>
             </div>
 
