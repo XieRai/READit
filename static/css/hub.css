@@ -101,24 +101,31 @@ body {
 
 /* Collapsed mode is strictly enabled on Desktop viewports (>= 768px) */
 @media (min-width: 768px) {
-    #hub-sidebar.sidebar-collapsed {
+    #hub-sidebar.sidebar-collapsed,
+    #hub-sidebar.sidebar-minimized {
         width: 68px !important;
+        min-width: 68px !important;
+        max-width: 68px !important;
     }
 
     #hub-sidebar.sidebar-collapsed .sidebar-label,
-    #hub-sidebar.sidebar-collapsed #account-chevron-icon {
+    #hub-sidebar.sidebar-minimized .sidebar-label,
+    #hub-sidebar.sidebar-collapsed #account-chevron-icon,
+    #hub-sidebar.sidebar-minimized #account-chevron-icon {
         display: none !important;
         opacity: 0 !important;
         pointer-events: none !important;
     }
 
-    #hub-sidebar.sidebar-collapsed .sidebar-header {
+    #hub-sidebar.sidebar-collapsed .sidebar-header,
+    #hub-sidebar.sidebar-minimized .sidebar-header {
         padding-left: 0.75rem !important;
         padding-right: 0.75rem !important;
         justify-content: center !important;
     }
 
-    #hub-sidebar.sidebar-collapsed #sidebar-toggle-btn {
+    #hub-sidebar.sidebar-collapsed #sidebar-toggle-btn,
+    #hub-sidebar.sidebar-minimized #sidebar-toggle-btn {
         position: absolute;
         right: -13px;
         top: 24px;
@@ -128,32 +135,49 @@ body {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
 
-    #hub-sidebar.sidebar-collapsed #sidebar-toggle-icon {
+    #hub-sidebar.sidebar-collapsed #sidebar-toggle-icon,
+    #hub-sidebar.sidebar-minimized #sidebar-toggle-icon {
         transform: rotate(180deg);
     }
 
-    #hub-sidebar.sidebar-collapsed .sidebar-nav-container {
-        padding-left: 0.75rem !important;
-        padding-right: 0.75rem !important;
+    #hub-sidebar.sidebar-collapsed .sidebar-nav-container,
+    #hub-sidebar.sidebar-minimized .sidebar-nav-container {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
 
-    #hub-sidebar.sidebar-collapsed .sidebar-nav-btn {
-        padding: 0.55rem !important;
+    #hub-sidebar.sidebar-collapsed .sidebar-nav-btn,
+    #hub-sidebar.sidebar-minimized .sidebar-nav-btn {
+        padding: 0.65rem 0.5rem !important;
         justify-content: center !important;
         border-radius: 12px !important;
     }
 
-    #hub-sidebar.sidebar-collapsed .sidebar-footer {
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
+    #hub-sidebar.sidebar-collapsed .sidebar-footer,
+    #hub-sidebar.sidebar-minimized .sidebar-footer {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
         justify-content: center !important;
     }
 
-    #hub-sidebar.sidebar-collapsed #hub-account-trigger {
+    #hub-sidebar.sidebar-collapsed #hub-account-trigger,
+    #hub-sidebar.sidebar-minimized #hub-account-trigger {
         justify-content: center !important;
-        pointer-events: none !important;
-        cursor: not-allowed !important;
-        opacity: 0.65 !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+        opacity: 1 !important;
+    }
+
+    #hub-sidebar.sidebar-collapsed #hub-account-trigger:hover #account-avatar-circle,
+    #hub-sidebar.sidebar-minimized #hub-account-trigger:hover #account-avatar-circle {
+        border-color: rgba(118, 184, 67, 0.8) !important;
+        box-shadow: 0 0 10px rgba(118, 184, 67, 0.4);
+        transform: scale(1.08);
+    }
+
+    #hub-sidebar.sidebar-collapsed #hub-account-drawer,
+    #hub-sidebar.sidebar-minimized #hub-account-drawer {
+        display: none !important;
     }
 }
 
@@ -420,3 +444,87 @@ body {
     background: rgba(59, 130, 246, 0.35) !important;
     color: transparent !important;
 }
+
+/* =====================================================================
+   BOTTOM EXPLANATION DRAWER & SPRING BUMP ANIMATION
+   ===================================================================== */
+@keyframes explanationBump {
+    0% {
+        transform: translate(-50%, 80px) scale(0.9);
+        opacity: 0;
+    }
+    50% {
+        transform: translate(-50%, -18px) scale(1.04);
+        opacity: 1;
+    }
+    75% {
+        transform: translate(-50%, 4px) scale(0.99);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, 0) scale(1);
+        opacity: 1;
+    }
+}
+
+.animate-explanation-bump {
+    animation: explanationBump 0.58s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+#bottom-explanation-drawer.drawer-open {
+    transform: translateY(0) !important;
+}
+
+#bottom-explanation-backdrop.backdrop-active {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* =====================================================================
+   DRAWER RESIZE SNAP STATES & PAPER SLIDE TRANSITIONS
+   ===================================================================== */
+#bottom-drawer-sheet.drawer-snap-small {
+    height: 36vh !important;
+}
+
+#bottom-drawer-sheet.drawer-snap-medium {
+    height: 62vh !important;
+}
+
+#bottom-drawer-sheet.drawer-snap-full {
+    height: 96vh !important;
+    max-height: 96vh !important;
+}
+
+@keyframes paperSlideUpEnter {
+    0% {
+        transform: translateY(28px);
+        opacity: 0.65;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes paperSlideDownEnter {
+    0% {
+        transform: translateY(-28px);
+        opacity: 0.65;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-paper-slide-up {
+    animation: paperSlideUpEnter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-paper-slide-down {
+    animation: paperSlideDownEnter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+

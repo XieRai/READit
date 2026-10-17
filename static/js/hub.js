@@ -155,11 +155,15 @@ function updateAccountUI() {
 }
 
 function handleAccountTriggerClick() {
-    if (isLoggedIn) {
-        toggleAccountMenu();
-    } else {
+    if (!isLoggedIn) {
         openAuthModal('signin');
+        return;
     }
+    if (isSidebarMinimized && window.innerWidth >= 768) {
+        openAccountModal('settings');
+        return;
+    }
+    toggleAccountMenu();
 }
 
 function toggleAccountMenu() {
@@ -188,13 +192,19 @@ function toggleSidebarMinimize() {
     if (!sidebar) return;
 
     if (isSidebarMinimized) {
+        const drawer = document.getElementById('hub-account-drawer');
+        if (drawer) drawer.classList.remove('open');
+        isAccountDrawerOpen = false;
+
         sidebar.classList.remove('md:w-[240px]');
-        sidebar.classList.add('sidebar-minimized');
+        sidebar.classList.add('sidebar-collapsed', 'sidebar-minimized', 'md:w-[68px]');
         if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
+        localStorage.setItem('readit_sidebar_minimized', 'true');
     } else {
-        sidebar.classList.remove('sidebar-minimized');
+        sidebar.classList.remove('sidebar-collapsed', 'sidebar-minimized', 'md:w-[68px]');
         sidebar.classList.add('md:w-[240px]');
         if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+        localStorage.setItem('readit_sidebar_minimized', 'false');
     }
 }
 
@@ -206,6 +216,7 @@ function toggleMobileSidebar(openState) {
     const shouldOpen = openState !== undefined ? openState : sidebar.classList.contains('-translate-x-full');
 
     if (shouldOpen) {
+        sidebar.classList.remove('sidebar-collapsed', 'sidebar-minimized');
         sidebar.classList.remove('-translate-x-full');
         sidebar.classList.add('translate-x-0');
         if (backdrop) {
@@ -230,23 +241,33 @@ function toggleMobileSidebar(openState) {
 
 function initSidebarState() {
     const sidebar = document.getElementById('hub-sidebar');
-    if (sidebar && !sidebar.classList.contains('sidebar-minimized')) {
+    const toggleIcon = document.getElementById('sidebar-toggle-icon');
+    if (!sidebar) return;
+
+    const savedState = localStorage.getItem('readit_sidebar_minimized');
+    if (savedState === 'true' && window.innerWidth >= 768) {
+        isSidebarMinimized = true;
+        sidebar.classList.remove('md:w-[240px]');
+        sidebar.classList.add('sidebar-collapsed', 'sidebar-minimized', 'md:w-[68px]');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
+    } else {
+        isSidebarMinimized = false;
+        sidebar.classList.remove('sidebar-collapsed', 'sidebar-minimized', 'md:w-[68px]');
         sidebar.classList.add('md:w-[240px]');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
     }
 }
 
 function openAuthModal(mode = 'signin', reasonText = null) {
-    const modal = document.getElementById('hub-auth-modal');
-    const hint = document.getElementById('auth-modal-hint');
+    const modal = document.getElementById('auth-modal');
     if (!modal) return;
-    modal.classList.remove('hidden');
 
-    if (hint) {
+    const note = document.getElementById('auth-signin-note');
+    if (note) {
         if (reasonText) {
-            hint.textContent = reasonText;
-            hint.classList.remove('hidden');
+            note.textContent = reasonText;
         } else {
-            hint.classList.add('hidden');
+            note.textContent = 'Sign in to upload custom research PDFs, save lexicons, and sync reading notes.';
         }
     }
 
@@ -255,21 +276,48 @@ function openAuthModal(mode = 'signin', reasonText = null) {
     } else {
         switchToSignIn();
     }
+
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.classList.add('opacity-100', 'pointer-events-auto');
+    });
 }
 
 function closeAuthModal() {
-    const modal = document.getElementById('hub-auth-modal');
-    if (modal) modal.classList.add('hidden');
+    const modal = document.getElementById('auth-modal');
+    if (!modal) return;
+    modal.classList.remove('opacity-100', 'pointer-events-auto');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
 }
 
 function switchToSignUp() {
-    const track = document.getElementById('auth-cards-track');
-    if (track) track.style.transform = 'translateX(-50%)';
+    const signinCard = document.getElementById('auth-card-signin');
+    const signupCard = document.getElementById('auth-card-signup');
+    if (signinCard) {
+        signinCard.classList.remove('translate-x-0', 'opacity-100', 'pointer-events-auto');
+        signinCard.classList.add('-translate-x-[150%]', 'opacity-0', 'pointer-events-none');
+    }
+    if (signupCard) {
+        signupCard.classList.remove('translate-x-[150%]', 'opacity-0', 'pointer-events-none');
+        signupCard.classList.add('translate-x-0', 'opacity-100', 'pointer-events-auto');
+    }
 }
 
 function switchToSignIn() {
-    const track = document.getElementById('auth-cards-track');
-    if (track) track.style.transform = 'translateX(0%)';
+    const signinCard = document.getElementById('auth-card-signin');
+    const signupCard = document.getElementById('auth-card-signup');
+    if (signupCard) {
+        signupCard.classList.remove('translate-x-0', 'opacity-100', 'pointer-events-auto');
+        signupCard.classList.add('translate-x-[150%]', 'opacity-0', 'pointer-events-none');
+    }
+    if (signinCard) {
+        signinCard.classList.remove('-translate-x-[150%]', 'opacity-0', 'pointer-events-none');
+        signinCard.classList.add('translate-x-0', 'opacity-100', 'pointer-events-auto');
+    }
 }
 
 function triggerPendingUploadsIfAny() {
@@ -1177,6 +1225,8 @@ function closeSmartReader() {
     const mobileHeader = document.getElementById('hub-mobile-header');
 
     togglePaperSwitcherDrawer(false);
+    closeExplanationBottomDrawer();
+    dismissExplanationPeek();
 
     if (readerView) {
         readerView.classList.add('hidden');
@@ -1788,6 +1838,9 @@ function resetInspector() {
     window.READIT_SYSTEM.featureCache = {};
     window.READIT_SYSTEM.copyPayloads = {};
 
+    closeExplanationBottomDrawer();
+    dismissExplanationPeek();
+
     const emptyState = document.getElementById('inspector-empty-state');
     const activeContent = document.getElementById('inspector-active-content');
     const badge = document.getElementById('inspector-badge');
@@ -1825,6 +1878,11 @@ function copyCurrentSelection() {
 // =====================================================================
 // NATURAL LANGUAGE SWITCHER (Simple EN | Bahasa ID)
 // =====================================================================
+function toggleReaderLang() {
+    const nextLang = (currentReaderLang === 'en') ? 'id' : 'en';
+    setReaderLang(nextLang);
+}
+
 function setReaderLang(lang) {
     if (!['en', 'id'].includes(lang)) return;
     currentReaderLang = lang;
@@ -1834,6 +1892,11 @@ function setReaderLang(lang) {
     const floatId = document.getElementById('floating-lang-id');
     const langBadge = document.getElementById('inspector-lang-badge');
     const ideaLangTag = document.getElementById('idea-lang-tag');
+    const floatingLangLabel = document.getElementById('floating-lang-label');
+
+    if (floatingLangLabel) {
+        floatingLangLabel.textContent = lang.toUpperCase();
+    }
 
     if (lang === 'en') {
         if (floatEn) floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
@@ -1971,6 +2034,18 @@ async function executeFeatureLens(feature, data) {
 }
 
 function setDrawerLoading(feature, isLoading) {
+    const bottomDrawer = document.getElementById('bottom-explanation-drawer');
+    const bottomContent = document.getElementById('bottom-drawer-content');
+    if (isLoading && bottomDrawer && bottomDrawer.classList.contains('drawer-open') && bottomContent) {
+        bottomContent.innerHTML = `
+            <div class="space-y-3 p-2">
+                <div class="h-4 bg-white/10 rounded-md w-3/4 animate-pulse"></div>
+                <div class="h-20 bg-white/5 rounded-xl border border-white/10 animate-pulse"></div>
+                <div class="h-20 bg-white/5 rounded-xl border border-white/10 animate-pulse"></div>
+            </div>
+        `;
+    }
+
     if (feature === 'translating_idea') {
         const btn = document.getElementById('btn-trigger-idea');
         const label = document.getElementById('btn-idea-label');
@@ -2166,6 +2241,9 @@ function renderFeatureOutput(feature, result) {
         if (container) container.classList.remove('hidden');
         if (errorEl) errorEl.classList.add('hidden');
     }
+
+    renderBottomDrawerContent(feature, result);
+    triggerExplanationBump(feature);
 }
 
 function renderFeatureError(feature, errorMsg) {
@@ -2205,6 +2283,596 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// =====================================================================
+// MOBILE BOTTOM EXPLANATION DRAWER & BUMP ANIMATION CONTROLLER
+// =====================================================================
+function triggerExplanationBump(feature) {
+    const isID = window.READIT_SYSTEM.currentLang === 'id';
+    const peek = document.getElementById('bottom-explanation-peek');
+    const peekBtn = document.getElementById('peek-capsule-btn');
+    const pulseDot = document.getElementById('peek-pulse-dot');
+    const solidDot = document.getElementById('peek-solid-dot');
+    const iconEl = document.getElementById('peek-feature-icon');
+    const labelEl = document.getElementById('peek-feature-label');
+    const actionLabel = document.getElementById('peek-action-label');
+    const drawer = document.getElementById('bottom-explanation-drawer');
+
+    // If bottom drawer is already open, keep peek capsule hidden
+    if (drawer && drawer.classList.contains('drawer-open')) {
+        if (peek) peek.classList.add('hidden');
+        return;
+    }
+
+    if (!peek) return;
+
+    let icon = '⚡';
+    let title = isID ? 'Ide Inti Siap' : 'Core Idea Ready';
+    let dotColor = 'bg-readitGreen';
+    let borderClass = 'border-readitGreen/40 hover:border-readitGreen shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(74,222,128,0.25)]';
+
+    if (feature === 'quick_reference') {
+        icon = '🔍';
+        title = isID ? 'Rujukan Cepat Siap' : 'Quick Ref Ready';
+        dotColor = 'bg-amber-400';
+        borderClass = 'border-amber-400/40 hover:border-amber-400 shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(251,191,36,0.25)]';
+    } else if (feature === 'easy_citation') {
+        icon = '📚';
+        title = isID ? 'Sitasi Mudah Siap' : 'Easy Citation Ready';
+        dotColor = 'bg-sky-400';
+        borderClass = 'border-sky-400/40 hover:border-sky-400 shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(56,189,248,0.25)]';
+    }
+
+    if (iconEl) iconEl.textContent = icon;
+    if (labelEl) labelEl.textContent = title;
+    if (actionLabel) actionLabel.textContent = isID ? 'Ketuk buka' : 'Tap to open';
+
+    if (pulseDot) pulseDot.className = `absolute w-3 h-3 rounded-full ${dotColor} animate-ping opacity-75`;
+    if (solidDot) solidDot.className = `relative w-2 h-2 rounded-full ${dotColor}`;
+
+    if (peekBtn) {
+        peekBtn.className = `flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#1A1A1A]/95 backdrop-blur-xl border ${borderClass} text-white cursor-pointer select-none group transition-all active:scale-95 touch-manipulation min-h-[44px]`;
+    }
+
+    // Trigger bump animation from bottom (spring physics)
+    peek.classList.remove('hidden');
+    peek.classList.remove('animate-explanation-bump');
+    void peek.offsetWidth; // Force DOM reflow to replay CSS keyframe
+    peek.classList.add('animate-explanation-bump');
+}
+
+function openExplanationBottomDrawer() {
+    const drawer = document.getElementById('bottom-explanation-drawer');
+    const backdrop = document.getElementById('bottom-explanation-backdrop');
+    const peek = document.getElementById('bottom-explanation-peek');
+
+    if (peek) peek.classList.add('hidden');
+    if (backdrop) {
+        backdrop.classList.remove('hidden');
+        void backdrop.offsetWidth;
+        backdrop.classList.add('backdrop-active');
+    }
+    if (drawer) {
+        drawer.classList.add('drawer-open');
+    }
+
+    setDrawerSnapState(currentDrawerSnap || 'medium');
+    syncBottomDrawerTabs(window.READIT_SYSTEM.activeFeature || 'translating_idea');
+}
+
+function closeExplanationBottomDrawer() {
+    const drawer = document.getElementById('bottom-explanation-drawer');
+    const backdrop = document.getElementById('bottom-explanation-backdrop');
+    const peek = document.getElementById('bottom-explanation-peek');
+
+    if (drawer) drawer.classList.remove('drawer-open');
+    if (backdrop) {
+        backdrop.classList.remove('backdrop-active');
+        setTimeout(() => {
+            if (!drawer || !drawer.classList.contains('drawer-open')) {
+                backdrop.classList.add('hidden');
+            }
+        }, 300);
+    }
+
+    // If an active explanation card exists, restore peek capsule so user can easily re-open
+    if (window.READIT_SYSTEM.activeCard && window.READIT_SYSTEM.activeCardData) {
+        if (peek) {
+            peek.classList.remove('hidden');
+            peek.classList.remove('animate-explanation-bump');
+        }
+    }
+}
+
+function dismissExplanationPeek(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const peek = document.getElementById('bottom-explanation-peek');
+    if (peek) {
+        peek.classList.add('hidden');
+        peek.classList.remove('animate-explanation-bump');
+    }
+}
+
+function syncBottomDrawerTabs(activeFeature) {
+    const tabs = ['translating_idea', 'quick_reference', 'easy_citation'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`bottom-tab-${t}`);
+        if (!btn) return;
+        if (t === activeFeature) {
+            btn.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 bg-readitGreen text-black shadow-sm touch-manipulation min-h-[36px]';
+        } else {
+            const isCitation = t === 'easy_citation';
+            const textClass = isCitation ? 'text-sky-300' : 'text-white/70';
+            btn.className = `flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 ${textClass} hover:text-white bg-transparent touch-manipulation min-h-[36px]`;
+        }
+    });
+
+    const hasCitations = window.READIT_SYSTEM.activeCardData?.citations?.length > 0;
+    const tabCitation = document.getElementById('bottom-tab-easy_citation');
+    if (tabCitation) {
+        if (hasCitations) {
+            tabCitation.classList.remove('hidden');
+        } else {
+            tabCitation.classList.add('hidden');
+        }
+    }
+}
+
+function switchBottomDrawerFeature(feature) {
+    syncBottomDrawerTabs(feature);
+    switchFeatureDrawer(feature);
+}
+
+function copyBottomDrawerContent() {
+    const feature = window.READIT_SYSTEM.activeFeature || 'translating_idea';
+    const text = window.READIT_SYSTEM.copyPayloads[feature];
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        const label = document.getElementById('copy-bottom-drawer-label');
+        if (label) {
+            const original = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(() => { label.textContent = original; }, 1500);
+        }
+    });
+}
+
+function renderBottomDrawerContent(feature, result) {
+    const isID = window.READIT_SYSTEM.currentLang === 'id';
+    const contentEl = document.getElementById('bottom-drawer-content');
+    const headerTitle = document.getElementById('drawer-feature-title');
+    const headerIcon = document.getElementById('drawer-feature-icon');
+    const langBadge = document.getElementById('drawer-lang-badge');
+
+    if (langBadge) {
+        langBadge.textContent = isID ? 'ID' : 'EN';
+        langBadge.className = isID
+            ? 'font-monoFeature text-[10px] px-2 py-0.5 rounded bg-readitGreen/15 text-readitGreen border border-readitGreen/30'
+            : 'font-monoFeature text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-readitGreen border border-white/10';
+    }
+
+    syncBottomDrawerTabs(feature);
+
+    const selectedSentence = window.READIT_SYSTEM.selectedText || window.READIT_SYSTEM.activeCardData?.text || '';
+
+    let quoteHtml = '';
+    if (selectedSentence) {
+        quoteHtml = `
+            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-xs text-white/80 leading-relaxed font-sans">
+                <span class="text-[10px] uppercase font-monoFeature tracking-wider text-white/40 block mb-1">${isID ? 'Teks Terpilih' : 'Selected Passage'}</span>
+                “${escapeHtml(selectedSentence)}”
+            </div>
+        `;
+    }
+
+    if (feature === 'translating_idea') {
+        if (headerTitle) headerTitle.textContent = isID ? 'Ide & Tindakan Inti' : 'Core Idea Deconstruction';
+        if (headerIcon) headerIcon.textContent = '⚡';
+
+        let coreAction = (result.core_action || '').trim();
+        let plainMeaning = (result.plain_meaning || '').trim();
+        let takeaway = (result.takeaway || '').trim();
+        let contextLink = (result.context_link || '').trim();
+
+        if (!coreAction && result.explanation) {
+            const raw = result.explanation;
+            const actionMatch = raw.match(/\\*\\*⚡?\\s*(?:CORE ACTION|TINDAKAN INTI)\\*\\*\\s*([\\s\\S]*?)(?=\\*\\*📖|\\*\\*PLAIN|\\*\\*BAHASA|$)/i);
+            const plainMatch = raw.match(/\\*\\*📖?\\s*(?:PLAIN ENGLISH|PLAIN LANGUAGE|BAHASA SEDERHANA)\\*\\*\\s*([\\s\\S]*?)(?=\\*\\*🎯|\\*\\*WHY|\\*\\*MENGAPA|$)/i);
+            const takeMatch = raw.match(/\\*\\*🎯?\\s*(?:WHY IT MATTERS|MENGAPA INI PENTING)\\*\\*\\s*([\\s\\S]*?)(?=\\*\\*🔒|\\*\\*CONTEXT|\\*\\*KONTEKS|$)/i);
+            const anchorMatch = raw.match(/\\*\\*🔒?\\s*(?:CONTEXT ANCHOR|JANGKAR KONTEKS)\\*\\*\\s*([\\s\\S]*?)$/i);
+
+            if (actionMatch) coreAction = actionMatch[1].trim();
+            if (plainMatch) plainMeaning = plainMatch[1].trim();
+            if (takeMatch) takeaway = takeMatch[1].replace(/^[•\\-\\*]\\s*/, '').trim();
+            if (anchorMatch) contextLink = anchorMatch[1].trim();
+            if (!plainMeaning) plainMeaning = raw;
+        }
+
+        if (!coreAction) {
+            coreAction = isID ? 'Mekanisme utama yang dijelaskan pada teks terpilih.' : 'Key mechanism outlined in selected text.';
+        }
+        if (!takeaway) {
+            takeaway = isID ? 'Secara langsung memengaruhi metodologi dan hasil riset.' : 'Directly impacts the core thesis and methodology.';
+        }
+        if (!contextLink) {
+            contextLink = window.READIT_SYSTEM.paperContext?.domain 
+                ? (isID ? `Bidang: ${window.READIT_SYSTEM.paperContext.domain}` : `Domain: ${window.READIT_SYSTEM.paperContext.domain}`)
+                : (isID ? 'Terkait erat dengan konteks keseluruhan makalah.' : 'Grounded in global paper context.');
+        }
+
+        if (contentEl) {
+            contentEl.innerHTML = `
+                ${quoteHtml}
+                <!-- Core Action -->
+                <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/25 space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <span>⚡</span>
+                        <span>${isID ? 'Tindakan Inti (Aktor → Aksi → Hasil)' : 'Core Action (Actor → Action → Outcome)'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm font-medium text-emerald-100 leading-snug select-text">${escapeHtml(coreAction)}</p>
+                </div>
+                <!-- Plain Meaning -->
+                <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                        <span>📖</span>
+                        <span>${isID ? 'Bahasa Sederhana (Tanpa Pangkas Batasan)' : 'Plain Language (0 Dropped Constraints)'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-white/90 leading-relaxed select-text font-sans">${escapeHtml(plainMeaning)}</p>
+                </div>
+                <!-- Why It Matters -->
+                <div class="p-3.5 rounded-xl bg-sky-950/25 border border-sky-500/25 space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                        <span>🎯</span>
+                        <span>${isID ? 'Mengapa Ini Penting?' : 'Why It Matters'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-sky-100 leading-snug select-text">${escapeHtml(takeaway)}</p>
+                </div>
+                <!-- Context Anchor -->
+                <div class="p-3.5 rounded-xl bg-purple-950/25 border border-purple-500/25 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                            <span>🔒</span>
+                            <span>${isID ? 'Jangkar Konteks' : 'Context Anchor'}</span>
+                        </div>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-200 border border-purple-500/20 font-monoFeature">${isID ? 'Pondasi Makalah' : 'Paper Grounding'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-purple-100/90 leading-relaxed font-sans select-text">${escapeHtml(contextLink)}</p>
+                </div>
+            `;
+        }
+
+    } else if (feature === 'quick_reference') {
+        if (headerTitle) headerTitle.textContent = isID ? 'Rujukan Cepat (Pelaku & Rujukan)' : 'Quick Reference (Actor & Referents)';
+        if (headerIcon) headerIcon.textContent = '🔍';
+
+        let realSubject = typeof result.real_subject === 'string' ? result.real_subject : JSON.stringify(result.real_subject || '');
+        let activeRewrite = typeof result.active_rewrite === 'string' ? result.active_rewrite : JSON.stringify(result.active_rewrite || '');
+        let passiveList = Array.isArray(result.passive_phrases) ? result.passive_phrases : [];
+        let antecedents = Array.isArray(result.antecedents) ? result.antecedents : [];
+
+        const passiveHtml = passiveList.length > 0
+            ? passiveList.map(phrase => `<span class="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/25 text-[11px] font-monoFeature">"${escapeHtml(String(phrase))}"</span>`).join('')
+            : `<span class="text-white/50 text-[11px] italic">${isID ? 'Tidak ada frasa pasif yang kabur' : 'No ambiguous passive phrases detected'}</span>`;
+
+        const antecedentsHtml = antecedents.length > 0
+            ? antecedents.map(item => {
+                const term = typeof item === 'object' ? (item.term || item.referent || Object.keys(item)[0]) : String(item);
+                const meaning = typeof item === 'object' ? (item.refers_to || item.meaning || item.antecedent || Object.values(item)[0]) : '';
+                return `<div class="p-2 rounded-lg bg-white/[0.03] border border-white/08 flex items-start gap-2">
+                    <span class="font-monoFeature font-semibold text-readitGreen shrink-0">${escapeHtml(term)}</span>
+                    <span class="text-white/40">→</span>
+                    <span class="text-white/90 leading-snug">${escapeHtml(meaning)}</span>
+                </div>`;
+            }).join('')
+            : `<span class="text-white/50 text-[11px] italic">${isID ? 'Semua rujukan kata ganti jelas' : 'All referents and pronouns are clear'}</span>`;
+
+        if (contentEl) {
+            contentEl.innerHTML = `
+                ${quoteHtml}
+                <!-- Real Subject / Actor -->
+                <div class="p-3.5 rounded-xl bg-amber-950/25 border border-amber-500/25 space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                        <span>🎯</span>
+                        <span>${isID ? 'Siapa Pelaku Sebenarnya? (Subjek Nyata)' : 'Who Actually Did This? (Real Subject)'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm font-medium text-amber-100 leading-snug select-text">${escapeHtml(realSubject || (isID ? 'Penulis / Peneliti studi ini' : 'The study authors / researchers'))}</p>
+                </div>
+                <!-- Active Rewrite -->
+                <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/60 flex items-center gap-1.5">
+                        <span>⚡</span>
+                        <span>${isID ? 'Tulis Ulang Kalimat Aktif Langsung' : 'Direct Active Voice Rewrite'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-white/90 leading-relaxed select-text font-sans">${escapeHtml(activeRewrite || (isID ? 'Penulis melakukan aksi secara langsung.' : 'The authors performed the action directly.'))}</p>
+                </div>
+                <!-- Passive Phrases -->
+                <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-1.5">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                        <span>🧩</span>
+                        <span>${isID ? 'Frasa Pasif yang Dideteksi & Diterjemahkan' : 'Passive Phrases Resolved'}</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">${passiveHtml}</div>
+                </div>
+                <!-- Antecedents & Referents -->
+                <div class="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-1.5">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                        <span>🔗</span>
+                        <span>${isID ? 'Rujukan Kata Ganti & Objek Ambigu' : 'Ambiguous Referents & Antecedents'}</span>
+                    </div>
+                    <div class="space-y-1.5 text-xs">${antecedentsHtml}</div>
+                </div>
+            `;
+        }
+
+    } else if (feature === 'easy_citation') {
+        if (headerTitle) headerTitle.textContent = isID ? 'Sitasi Mudah' : 'Easy Citation Context';
+        if (headerIcon) headerIcon.textContent = '📚';
+
+        const citLabel = result.citation_label || (window.READIT_SYSTEM.activeCardData?.citations?.[0] || '[1]');
+        const refTitle = result.reference_title || (isID ? 'Daftar Pustaka Makalah (Rujukan Terindeks)' : 'Paper Reference Bibliography');
+        const supportingClaim = result.supporting_claim || (isID ? 'Klaim utama kalimat ini didasarkan pada rujukan tersebut.' : 'Sentence claim is substantiated by this literature.');
+        const whyCited = result.why_cited || (isID ? 'Dikutip untuk memperkuat bukti empiris dari premis penelitian.' : 'Cited to substantiate the empirical claim in this study.');
+
+        if (contentEl) {
+            contentEl.innerHTML = `
+                ${quoteHtml}
+                <!-- Reference Title -->
+                <div class="p-3.5 rounded-xl bg-sky-950/25 border border-sky-500/25 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                            <span>🏷️</span>
+                            <span>${isID ? 'Karya Ilmiah yang Dikutip' : 'Cited Work / Foundation'}</span>
+                        </div>
+                        <span class="text-[10px] font-monoFeature px-1.5 py-0.5 rounded bg-sky-400/15 text-sky-200 border border-sky-400/25">${escapeHtml(citLabel)}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm font-medium text-sky-100 leading-snug select-text">${escapeHtml(refTitle)}</p>
+                </div>
+                <!-- Supporting Claim -->
+                <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/60 flex items-center gap-1.5">
+                        <span>📌</span>
+                        <span>${isID ? 'Klaim Makalah yang Didukung Sitasi' : 'Supporting Claim Grounded on Citation'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-white/90 leading-relaxed select-text font-sans">${escapeHtml(supportingClaim)}</p>
+                </div>
+                <!-- Why Authors Cited This -->
+                <div class="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-1">
+                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <span>💡</span>
+                        <span>${isID ? 'Alasan Penulis Mengutip Rujukan Ini' : 'Why the Authors Cited This'}</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-emerald-100/90 leading-relaxed select-text font-sans">${escapeHtml(whyCited)}</p>
+                </div>
+            `;
+        }
+    }
+}
+
+let isDraggingDrawer = false;
+let drawerDragStartY = 0;
+let drawerInitialHeight = 0;
+let currentDrawerSnap = 'medium'; // 'small' | 'medium' | 'full'
+
+function setDrawerSnapState(snap) {
+    if (!['small', 'medium', 'full'].includes(snap)) snap = 'medium';
+    currentDrawerSnap = snap;
+    const sheet = document.getElementById('bottom-drawer-sheet');
+    const icon = document.getElementById('drawer-size-icon');
+    const toggleBtn = document.getElementById('btn-toggle-drawer-snap');
+    if (!sheet) return;
+
+    sheet.style.height = ''; // clear any inline height from dragging
+    sheet.classList.remove('drawer-snap-small', 'drawer-snap-medium', 'drawer-snap-full');
+    sheet.classList.add(`drawer-snap-${snap}`);
+
+    if (icon) {
+        icon.textContent = snap === 'full' ? '⤡' : '⤢';
+    }
+    if (toggleBtn) {
+        toggleBtn.title = snap === 'full' ? 'Make smaller' : 'Cover whole screen';
+    }
+}
+
+function toggleDrawerSnapSize() {
+    if (currentDrawerSnap === 'full') {
+        setDrawerSnapState('small');
+    } else {
+        setDrawerSnapState('full');
+    }
+}
+
+function setupDrawerTouchGestures() {
+    const header = document.getElementById('bottom-drawer-header');
+    const sheet = document.getElementById('bottom-drawer-sheet');
+    if (!header || !sheet) return;
+
+    const onDragStart = (clientY) => {
+        isDraggingDrawer = true;
+        drawerDragStartY = clientY;
+        drawerInitialHeight = sheet.getBoundingClientRect().height;
+        sheet.style.transition = 'none';
+    };
+
+    const onDragMove = (clientY) => {
+        if (!isDraggingDrawer) return;
+        const deltaY = drawerDragStartY - clientY; // dragging up = positive
+        const newHeight = Math.max(100, Math.min(window.innerHeight * 0.96, drawerInitialHeight + deltaY));
+        sheet.style.height = `${newHeight}px`;
+
+        const backdrop = document.getElementById('bottom-explanation-backdrop');
+        if (backdrop && newHeight < 200) {
+            backdrop.style.opacity = String(Math.max(0.1, newHeight / 200));
+        }
+    };
+
+    const onDragEnd = () => {
+        if (!isDraggingDrawer) return;
+        isDraggingDrawer = false;
+
+        sheet.style.transition = 'height 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)';
+        const finalHeight = sheet.getBoundingClientRect().height;
+        const vh = window.innerHeight;
+
+        const backdrop = document.getElementById('bottom-explanation-backdrop');
+        if (backdrop) backdrop.style.opacity = '';
+
+        if (finalHeight <= vh * 0.22) {
+            closeExplanationBottomDrawer();
+        } else if (finalHeight >= vh * 0.74) {
+            setDrawerSnapState('full');
+        } else if (finalHeight <= vh * 0.48) {
+            setDrawerSnapState('small');
+        } else {
+            setDrawerSnapState('medium');
+        }
+    };
+
+    // Mobile Touch Drag
+    header.addEventListener('touchstart', (e) => {
+        if (e.target.closest('button, #bottom-drawer-content, input')) return;
+        if (e.touches && e.touches[0]) {
+            onDragStart(e.touches[0].clientY);
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isDraggingDrawer && e.touches && e.touches[0]) {
+            onDragMove(e.touches[0].clientY);
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchend', onDragEnd, { passive: true });
+
+    // Desktop Pointer Drag
+    header.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button, #bottom-drawer-content, input')) return;
+        onDragStart(e.clientY);
+    });
+
+    window.addEventListener('pointermove', (e) => {
+        if (isDraggingDrawer) {
+            onDragMove(e.clientY);
+        }
+    });
+
+    window.addEventListener('pointerup', onDragEnd);
+}
+
+// =====================================================================
+// PAPER PAGE TURN ON SLIDE UP / SLIDE DOWN CONTROLLER
+// =====================================================================
+let paperTouchStartY = 0;
+let paperTouchStartX = 0;
+let paperTouchStartTime = 0;
+let isPaperSwiping = false;
+
+function setupPaperSlideGestures() {
+    const viewport = document.getElementById('reader-viewport');
+    if (!viewport) return;
+
+    viewport.addEventListener('touchstart', (e) => {
+        if (!currentPdf || totalPages <= 1) return;
+        if (e.target.closest('#bottom-explanation-drawer, #bottom-explanation-peek, #reader-floating-action-bar, #floating-actions-bar, button, a, input')) {
+            isPaperSwiping = false;
+            return;
+        }
+
+        if (e.touches && e.touches.length === 1) {
+            paperTouchStartY = e.touches[0].clientY;
+            paperTouchStartX = e.touches[0].clientX;
+            paperTouchStartTime = Date.now();
+            isPaperSwiping = true;
+        }
+    }, { passive: true });
+
+    viewport.addEventListener('touchend', (e) => {
+        if (!isPaperSwiping || !currentPdf) return;
+        isPaperSwiping = false;
+
+        // Skip if user was selecting text
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim().length > 0) return;
+
+        const touch = e.changedTouches && e.changedTouches[0];
+        if (!touch) return;
+
+        const deltaY = paperTouchStartY - touch.clientY; // positive = dragged UP, negative = dragged DOWN
+        const deltaX = Math.abs(paperTouchStartX - touch.clientX);
+        const timeElapsed = Date.now() - paperTouchStartTime;
+
+        // Require dominant vertical gesture and at least 40px drag
+        if (Math.abs(deltaY) < 40 || Math.abs(deltaY) < deltaX * 1.2 || timeElapsed > 1200) {
+            return;
+        }
+
+        const isAtTop = viewport.scrollTop <= 25;
+        const isAtBottom = (viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 30);
+        const fitsScreen = (viewport.scrollHeight <= viewport.clientHeight + 40);
+
+        if (deltaY > 40) {
+            // Slide UP -> Next Page
+            if (fitsScreen || isAtBottom) {
+                if (currentPageNum < totalPages) {
+                    triggerPaperPageTurn(1, 'up');
+                }
+            }
+        } else if (deltaY < -40) {
+            // Slide DOWN -> Previous Page
+            if (fitsScreen || isAtTop) {
+                if (currentPageNum > 1) {
+                    triggerPaperPageTurn(-1, 'down');
+                }
+            }
+        }
+    }, { passive: true });
+
+    // Also support mouse wheel past edges for desktop users
+    let wheelCooldown = false;
+    viewport.addEventListener('wheel', (e) => {
+        if (!currentPdf || wheelCooldown || totalPages <= 1) return;
+        const isAtTop = viewport.scrollTop <= 10;
+        const isAtBottom = (viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 20);
+        const fitsScreen = (viewport.scrollHeight <= viewport.clientHeight + 40);
+
+        if (e.deltaY > 50 && (fitsScreen || isAtBottom)) {
+            if (currentPageNum < totalPages) {
+                wheelCooldown = true;
+                triggerPaperPageTurn(1, 'up');
+                setTimeout(() => { wheelCooldown = false; }, 400);
+            }
+        } else if (e.deltaY < -50 && (fitsScreen || isAtTop)) {
+            if (currentPageNum > 1) {
+                wheelCooldown = true;
+                triggerPaperPageTurn(-1, 'down');
+                setTimeout(() => { wheelCooldown = false; }, 400);
+            }
+        }
+    }, { passive: true });
+}
+
+function triggerPaperPageTurn(delta, direction) {
+    const paperCard = document.getElementById('paper-card');
+    const viewport = document.getElementById('reader-viewport');
+
+    if (paperCard) {
+        const animClass = direction === 'up' ? 'animate-paper-slide-up' : 'animate-paper-slide-down';
+        paperCard.classList.remove('animate-paper-slide-up', 'animate-paper-slide-down');
+        void paperCard.offsetWidth; // trigger reflow
+        paperCard.classList.add(animClass);
+        setTimeout(() => {
+            paperCard.classList.remove(animClass);
+        }, 320);
+    }
+
+    if (viewport) {
+        viewport.scrollTop = 0;
+    }
+
+    changePage(delta);
 }
 
 // Left Sidebar Tab Switcher
@@ -2369,6 +3037,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalDragAndDrop();
     renderHubDocuments();
     setTimeout(initGoogleIdentity, 600);
+    setupDrawerTouchGestures();
+    setupPaperSlideGestures();
 
     // Register selection change listeners for floating actions bar on PDF TextLayer
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -2480,3 +3150,16 @@ window.handleDrawerDragEnter = handleDrawerDragEnter;
 window.handleDrawerDragLeave = handleDrawerDragLeave;
 window.handleDrawerDrop = handleDrawerDrop;
 window.handleDrawerDragEnd = handleDrawerDragEnd;
+window.triggerExplanationBump = triggerExplanationBump;
+window.openExplanationBottomDrawer = openExplanationBottomDrawer;
+window.closeExplanationBottomDrawer = closeExplanationBottomDrawer;
+window.dismissExplanationPeek = dismissExplanationPeek;
+window.switchBottomDrawerFeature = switchBottomDrawerFeature;
+window.copyBottomDrawerContent = copyBottomDrawerContent;
+window.toggleReaderLang = toggleReaderLang;
+window.setDrawerSnapState = setDrawerSnapState;
+window.toggleDrawerSnapSize = toggleDrawerSnapSize;
+window.triggerPaperPageTurn = triggerPaperPageTurn;
+window.setupPaperSlideGestures = setupPaperSlideGestures;
+
+
