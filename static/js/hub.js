@@ -1,12 +1,16 @@
 /**
  * READit Document Hub Controller (hub.js)
+ * Clean, Unified PDF.js Reading Engine with Real-Time Companion Inspector
  * Features:
- *  - Collapsible / Minimizable Sidebar (w-[240px] <-> w-[68px], Ctrl+B shortcut)
- *  - Drag & Drop PDF Validation (<20MB, full-screen overlay + slot card)
- *  - Multi-Tab Reading System (Switch between multiple open files, close tabs, add new tab)
- *  - PDF.js Client-Side Extraction & Interactive Sentence Reader
- *  - Smooth Frosted Auth Modal with Sliding Login / Sign Up Cards
- *  - Live Gemini 2.0 Flash AI Integration for Sentence Analysis
+ *  - Zero-backend client-side PDF import via PDF.js with Canvas + interactive TextLayer
+ *  - Floating Action Bar near selection (Idea, Quick Ref, conditional Citation)
+ *  - Companion Inspector Card beside paper with focused drawers for cognitive load reduction
+ *  - Strict Citation availability (only visible when [1], (Author et al), or superscripts exist)
+ *  - Anti-hallucination paper context indexing (/api/context/prebake) on load
+ *  - Persistent card beside paper until page change or new feature click
+ *  - Natural language switching (Simple EN / Bahasa ID) with seamless re-evaluation
+ *  - Multi-Tab Reading System with drag-and-drop reordering
+ *  - Frosted Auth Modal with Supabase / Google Identity Services
  */
 
 // =====================================================================
@@ -73,7 +77,6 @@ async function initAccountState() {
                 loadFallbackUser();
             }
 
-            // Listen for OAuth redirects and auth state changes
             sb.auth.onAuthStateChange((event, session) => {
                 if (session && session.user) {
                     applySupabaseUser(session.user);
@@ -151,52 +154,11 @@ function updateAccountUI() {
     }
 }
 
-
-let isMobileSidebarOpen = false;
-
-function toggleMobileSidebar(openState) {
-    const sidebar = document.getElementById('hub-sidebar');
-    const backdrop = document.getElementById('hub-mobile-sidebar-backdrop');
-    if (!sidebar) return;
-
-    if (openState === undefined) {
-        isMobileSidebarOpen = !isMobileSidebarOpen;
-    } else {
-        isMobileSidebarOpen = !!openState;
-    }
-
-    if (isMobileSidebarOpen) {
-        // Strip collapsed state on mobile so all button text and labels are 100% visible
-        sidebar.classList.remove('sidebar-collapsed');
-        sidebar.classList.remove('-translate-x-full');
-        sidebar.classList.add('translate-x-0');
-        if (backdrop) {
-            backdrop.classList.remove('hidden', 'pointer-events-none');
-            requestAnimationFrame(() => {
-                backdrop.classList.add('opacity-100');
-            });
-        }
-    } else {
-        sidebar.classList.add('-translate-x-full');
-        sidebar.classList.remove('translate-x-0');
-        if (backdrop) {
-            backdrop.classList.remove('opacity-100');
-            setTimeout(() => {
-                backdrop.classList.add('hidden', 'pointer-events-none');
-            }, 300);
-        }
-    }
-}
-
 function handleAccountTriggerClick() {
-    // If the sidebar is collapsed/shrinked on desktop, unable to tap on the profile icon
-    if (isSidebarMinimized && window.innerWidth >= 768) {
-        return;
-    }
-    if (!isLoggedIn) {
-        openAuthModal('signin');
-    } else {
+    if (isLoggedIn) {
         toggleAccountMenu();
+    } else {
+        openAuthModal('signin');
     }
 }
 
@@ -208,175 +170,119 @@ function toggleAccountMenu() {
     isAccountDrawerOpen = !isAccountDrawerOpen;
     const drawer = document.getElementById('hub-account-drawer');
     const chevron = document.getElementById('account-chevron-icon');
-    if (!drawer || !chevron) return;
-    if (isAccountDrawerOpen) {
-        drawer.classList.add('open');
-        chevron.style.transform = 'rotate(180deg)';
-    } else {
-        drawer.classList.remove('open');
-        chevron.style.transform = 'rotate(0deg)';
+    if (drawer) {
+        if (isAccountDrawerOpen) {
+            drawer.classList.add('open');
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        } else {
+            drawer.classList.remove('open');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
     }
-}
-
-// =====================================================================
-// SIDEBAR COLLAPSE / MINIMIZE SYSTEM
-// =====================================================================
-function initSidebarState() {
-    const saved = localStorage.getItem('readit_sidebar_collapsed');
-    // Only apply collapsed state on desktop viewports (>= 768px)
-    if (saved === 'true' && window.innerWidth >= 768) {
-        isSidebarMinimized = true;
-        const sidebar = document.getElementById('hub-sidebar');
-        if (sidebar) sidebar.classList.add('sidebar-collapsed');
-    } else {
-        isSidebarMinimized = false;
-        const sidebar = document.getElementById('hub-sidebar');
-        if (sidebar) sidebar.classList.remove('sidebar-collapsed');
-    }
-    updateSidebarToggleTooltip();
 }
 
 function toggleSidebarMinimize() {
-    // On mobile viewports (< 768px), closing or toggling hides the mobile drawer instead
-    if (window.innerWidth < 768) {
-        toggleMobileSidebar(false);
-        return;
-    }
-
     isSidebarMinimized = !isSidebarMinimized;
     const sidebar = document.getElementById('hub-sidebar');
-    if (sidebar) {
-        sidebar.classList.toggle('sidebar-collapsed', isSidebarMinimized);
-    }
-    if (isSidebarMinimized) {
-        const drawer = document.getElementById('hub-account-drawer');
-        if (drawer) drawer.classList.remove('open');
-        isAccountDrawerOpen = false;
-        const chevron = document.getElementById('account-chevron-icon');
-        if (chevron) chevron.style.transform = 'rotate(0deg)';
-    }
-    localStorage.setItem('readit_sidebar_collapsed', isSidebarMinimized ? 'true' : 'false');
-    updateSidebarToggleTooltip();
-}
-
-function updateSidebarToggleTooltip() {
-    const btn = document.getElementById('sidebar-toggle-btn');
-    if (btn) {
-        btn.title = isSidebarMinimized ? 'Expand sidebar (Ctrl+B)' : 'Minimize sidebar (Ctrl+B)';
-    }
-}
-
-// Listen to screen resize to ensure mobile sidebar always has full text
-window.addEventListener('resize', () => {
-    const sidebar = document.getElementById('hub-sidebar');
+    const toggleIcon = document.getElementById('sidebar-toggle-icon');
     if (!sidebar) return;
-    if (window.innerWidth < 768) {
-        sidebar.classList.remove('sidebar-collapsed');
+
+    if (isSidebarMinimized) {
+        sidebar.classList.remove('md:w-[240px]');
+        sidebar.classList.add('sidebar-minimized');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
     } else {
-        const saved = localStorage.getItem('readit_sidebar_collapsed');
-        if (saved === 'true') {
-            isSidebarMinimized = true;
-            sidebar.classList.add('sidebar-collapsed');
-        }
-        toggleMobileSidebar(false);
+        sidebar.classList.remove('sidebar-minimized');
+        sidebar.classList.add('md:w-[240px]');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
     }
-    updateSidebarToggleTooltip();
-});
+}
 
-// =====================================================================
-// AUTH MODAL: SMOOTH FROSTED BACKDROP & SLIDING LOGIN / SIGN UP CARDS
-// =====================================================================
-function openAuthModal(mode = 'signin', customNote = null) {
-    const modal = document.getElementById('auth-modal');
+function toggleMobileSidebar(openState) {
+    const sidebar = document.getElementById('hub-sidebar');
+    const backdrop = document.getElementById('hub-mobile-sidebar-backdrop');
+    if (!sidebar) return;
+
+    const shouldOpen = openState !== undefined ? openState : sidebar.classList.contains('-translate-x-full');
+
+    if (shouldOpen) {
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+        if (backdrop) {
+            backdrop.classList.remove('hidden', 'pointer-events-none');
+            requestAnimationFrame(() => {
+                backdrop.classList.remove('opacity-0');
+                backdrop.classList.add('opacity-100');
+            });
+        }
+    } else {
+        sidebar.classList.remove('translate-x-0');
+        sidebar.classList.add('-translate-x-full');
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => {
+                backdrop.classList.add('hidden', 'pointer-events-none');
+            }, 300);
+        }
+    }
+}
+
+function initSidebarState() {
+    const sidebar = document.getElementById('hub-sidebar');
+    if (sidebar && !sidebar.classList.contains('sidebar-minimized')) {
+        sidebar.classList.add('md:w-[240px]');
+    }
+}
+
+function openAuthModal(mode = 'signin', reasonText = null) {
+    const modal = document.getElementById('hub-auth-modal');
+    const hint = document.getElementById('auth-modal-hint');
     if (!modal) return;
+    modal.classList.remove('hidden');
 
-    const note = document.getElementById('auth-signin-note');
-    if (note) {
-        note.textContent = customNote || 'Sign in to upload custom research PDFs, save lexicons, and sync reading notes.';
+    if (hint) {
+        if (reasonText) {
+            hint.textContent = reasonText;
+            hint.classList.remove('hidden');
+        } else {
+            hint.classList.add('hidden');
+        }
     }
 
     if (mode === 'signup') {
-        switchToSignUp(true);
+        switchToSignUp();
     } else {
-        switchToSignIn(true);
+        switchToSignIn();
     }
-
-    modal.classList.remove('hidden');
-    requestAnimationFrame(() => {
-        modal.classList.remove('opacity-0', 'pointer-events-none');
-    });
 }
 
 function closeAuthModal() {
-    const modal = document.getElementById('auth-modal');
-    if (!modal) return;
-    modal.classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => {
-        modal.classList.add('hidden');
-    }, 320);
+    const modal = document.getElementById('hub-auth-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
-function switchToSignUp(instant = false) {
-    const signin = document.getElementById('auth-card-signin');
-    const signup = document.getElementById('auth-card-signup');
-    if (!signin || !signup) return;
-
-    if (instant) {
-        signin.style.transition = 'none';
-        signup.style.transition = 'none';
-    }
-
-    signin.classList.remove('translate-x-0', 'opacity-100', 'pointer-events-auto');
-    signin.classList.add('-translate-x-[150%]', 'opacity-0', 'pointer-events-none');
-
-    signup.classList.remove('translate-x-[150%]', 'opacity-0', 'pointer-events-none');
-    signup.classList.add('translate-x-0', 'opacity-100', 'pointer-events-auto');
-
-    if (instant) {
-        void signup.offsetWidth;
-        signin.style.transition = '';
-        signup.style.transition = '';
-    }
+function switchToSignUp() {
+    const track = document.getElementById('auth-cards-track');
+    if (track) track.style.transform = 'translateX(-50%)';
 }
 
-function switchToSignIn(instant = false) {
-    const signin = document.getElementById('auth-card-signin');
-    const signup = document.getElementById('auth-card-signup');
-    if (!signin || !signup) return;
-
-    if (instant) {
-        signin.style.transition = 'none';
-        signup.style.transition = 'none';
-    }
-
-    signup.classList.remove('translate-x-0', 'opacity-100', 'pointer-events-auto');
-    signup.classList.add('translate-x-[150%]', 'opacity-0', 'pointer-events-none');
-
-    signin.classList.remove('-translate-x-[150%]', 'opacity-0', 'pointer-events-none');
-    signin.classList.add('translate-x-0', 'opacity-100', 'pointer-events-auto');
-
-    if (instant) {
-        void signin.offsetWidth;
-        signin.style.transition = '';
-        signup.style.transition = '';
-    }
+function switchToSignIn() {
+    const track = document.getElementById('auth-cards-track');
+    if (track) track.style.transform = 'translateX(0%)';
 }
 
 function triggerPendingUploadsIfAny() {
     if (pendingUploadFiles && pendingUploadFiles.length > 0) {
-        const toProcess = pendingUploadFiles;
+        const files = [...pendingUploadFiles];
         pendingUploadFiles = [];
-        setTimeout(() => {
-            handlePdfFiles(toProcess);
-        }, 350);
+        handlePdfFiles(files);
     }
 }
 
 function initGoogleIdentity() {
+    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '922432658863-m5a3o71dpsj4p45k1n359fptgh89j31p.apps.googleusercontent.com';
     if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
-    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '246901689836-pv7f039tveaqjcpgpf8dg6kr3rals8ba.apps.googleusercontent.com';
-    if (!clientId) return;
-
     try {
         window.google.accounts.id.initialize({
             client_id: clientId,
@@ -423,12 +329,10 @@ async function handleGoogleSignIn() {
         return;
     }
 
-    // Attempt Google Identity Services in-situ prompt (shows "READit" directly, zero domain redirect)
     if (window.google && window.google.accounts && window.google.accounts.id) {
         initGoogleIdentity();
         window.google.accounts.id.prompt((notification) => {
             if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                console.log('One-Tap prompt not active, falling back to direct OAuth redirect.');
                 fallbackToOAuthRedirect(sb);
             }
         });
@@ -451,32 +355,25 @@ async function fallbackToOAuthRedirect(sb) {
                 }
             }
         });
-
         if (error) {
-            console.warn('Google sign-in error:', error);
-            showHubToast(`Sign-in error: ${error.message}`);
-            fallbackDemoGoogleLogin();
+            showHubToast(`Google Auth Error: ${error.message}`);
         }
     } catch (err) {
-        console.error('Google OAuth exception:', err);
-        fallbackDemoGoogleLogin();
+        console.error('OAuth redirect error:', err);
     }
 }
 
-
-
-
 function fallbackDemoGoogleLogin() {
     currentUser = {
-        name: 'Google Scholar',
-        email: 'scholar@gmail.com',
+        name: 'Demo Researcher',
+        email: 'researcher@readit.ai',
         plan: 'Free plan'
     };
     isLoggedIn = true;
     localStorage.setItem('readit_user', JSON.stringify(currentUser));
     updateAccountUI();
     closeAuthModal();
-    showHubToast('Signed in with Google (Demo)');
+    showHubToast('Signed in as Demo Researcher');
     triggerPendingUploadsIfAny();
 }
 
@@ -513,7 +410,6 @@ async function handleEmailSignIn(event) {
         }
     }
 
-    // Local fallback
     const namePart = email.split('@')[0] || 'Researcher';
     currentUser = {
         name: namePart.charAt(0).toUpperCase() + namePart.slice(1),
@@ -569,7 +465,6 @@ async function handleEmailSignUp(event) {
         }
     }
 
-    // Local fallback
     currentUser = {
         name: name,
         email: email,
@@ -599,96 +494,12 @@ async function handleLogoutAction() {
     showHubToast('Signed out of READit');
 }
 
-
 // =====================================================================
-// PRE-BAKED DEMO FILE SENTENCE DATA
+// RECENT DOCUMENTS LIST & MULTI-TAB SYSTEM STATE (CLEAN EMPTY INITIAL STATE)
 // =====================================================================
-const readerSentenceData = [
-    {
-        badge: "SENTENCE 01 • TRANSLATING IDEA",
-        orig: '"This systematic review aims to investigate recent developments in the area of arc fault detection."',
-        en: '"This paper reviews the newest methods for detecting dangerous electrical sparks (arc faults)."',
-        id: '"Tinjauan sistematis ini bertujuan mempelajari perkembangan terbaru dalam mendeteksi percikan api listrik (arc fault)."',
-        extra: '<span class="text-neutral-400">Role:</span><span class="px-2.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Paper Objective</span>'
-    },
-    {
-        badge: "SENTENCE 02 • TRANSLATING IDEA + LEXICAL HIT",
-        orig: '"The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults and the likelihood of related fires, presenting a matter of considerable concern."',
-        en: '"As electricity use grows and power grids expand at the same time, dangerous electrical sparks (arc faults) and fires are much more likely to happen."',
-        id: '"Seiring meningkatnya kebutuhan listrik dan meluasnya jaringan energi secara bersamaan (concomitant), risiko percikan api listrik dan kebakaran menjadi jauh lebih tinggi."',
-        extra: '<span class="text-neutral-400">Detected Terms:</span><span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30"><strong>concomitant</strong> (C2) → happening at the same time</span><span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30"><strong>heightened</strong> (C1) → increased</span>'
-    },
-    {
-        badge: "SENTENCE 03 • QUICK REFERENCE + IDEA",
-        orig: '"To address this challenge, this review focuses on the role of artificial intelligence (AI) in arc fault detection, with the objective of illuminating its advantages and identifying current limitations."',
-        en: '"To solve the fire risk from Sentence 2, the authors examine how AI can detect arc faults faster, while pointing out where AI still struggles."',
-        id: '"Untuk mengatasi risiko kebakaran pada Kalimat 2, tinjauan ini berfokus pada peran AI dalam mendeteksi gangguan busur api beserta kelebihan dan keterbatasannya."',
-        extra: '<span class="text-neutral-400">Reference Link:</span><span class="px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-400/30"><strong>"this challenge"</strong> refers to → Heightened risk of arc faults &amp; fires (Sentence 2)</span>'
-    },
-    {
-        badge: "SENTENCE 04 • PASSIVE VOICE QUICK REFERENCE",
-        orig: '"Through a meticulous literature selection process, a total of 63 articles were included in the final analysis."',
-        en: '"The authors (Tian et al.) carefully screened the research literature and selected 63 peer-reviewed papers for their final analysis."',
-        id: '"Melalui proses seleksi literatur yang ketat, para penulis (Tian dkk.) menyertakan total 63 artikel jurnal dalam analisis akhir."',
-        extra: '<span class="text-neutral-400">Passive Resolved:</span><span class="px-2.5 py-0.5 rounded bg-emerald-500/15 text-emerald-200 border border-emerald-500/30"><strong>"were included"</strong> → Actor: The Review Authors (Tian et al., 2023)</span>'
-    },
-    {
-        badge: "SENTENCE 05 • PASSIVE VOICE + LEXICAL HIT",
-        orig: '"Simultaneously, three major challenges were also identified, including missed and false detections, the restricted application of neural networks and the paucity of relevant data."',
-        en: '"At the same time, analyzing those 63 papers revealed three big hurdles: missed or false alarms, inflexible neural networks, and a severe shortage (paucity) of training data."',
-        id: '"Secara bersamaan, ditemukan tiga tantangan utama: deteksi yang terlewat/palsu, keterbatasan penerapan jaringan saraf, dan kelangkaan (paucity) data yang relevan."',
-        extra: '<span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30"><strong>paucity</strong> (C2) → severe shortage</span><span class="px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-400/30"><strong>"were also identified"</strong> → Actor: Tian et al. across the 63 articles</span>'
-    },
-    {
-        badge: "SENTENCE 06 • TRANSLATING IDEA",
-        orig: '"In conclusion, AI has exhibited tremendous potential for transforming the field of arc fault detection and holds substantial promise for enhancing electrical safety."',
-        en: '"Overall, AI shows huge promise for making arc fault detection much more reliable and keeping electrical grids safe."',
-        id: '"Kesimpulannya, AI menunjukkan potensi besar untuk mengubah bidang deteksi gangguan busur api dan meningkatkan keselamatan kelistrikan."',
-        extra: '<span class="text-neutral-400">Detected Terms:</span><span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30"><strong>exhibited</strong> (C1) → shown / demonstrated</span>'
-    },
-    {
-        badge: "SENTENCE 07 • TRANSLATING IDEA + LEXICAL HIT",
-        orig: '"The proliferation of urbanization and industrialization has resulted in a surging demand for energy, necessitating the development of new and efficient energy systems."',
-        en: '"Rapid city and factory growth has caused energy demand to spike, requiring newer and more efficient power systems."',
-        id: '"Pesatnya pertumbuhan (proliferation) urbanisasi dan industrialisasi meningkatkan kebutuhan energi secara drastis."',
-        extra: '<span class="text-neutral-400">Detected Terms:</span><span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30"><strong>proliferation</strong> (C1) → rapid growth / spread</span>'
-    },
-    {
-        badge: "SENTENCE 08 • EASY CITATION [1]",
-        orig: '"Nonetheless, the outdated nature of current photovoltaic and energy storage systems has given rise to numerous incidents of arc faults [1]."',
-        en: '"However, aging solar panels (photovoltaic) and battery storage systems have caused many dangerous arc fault incidents [1]."',
-        id: '"Namun, kondisi sistem panel surya (fotovoltaik) dan penyimpanan energi yang menua telah memicu banyak insiden percikan busur api [1]."',
-        extra: '<span class="px-2.5 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30"><strong>Inline Citation [1]</strong> → Lu, S., Phung, B. T., &amp; Zhang, D. (2018). "A comprehensive review on DC arc fault detection in photovoltaic systems." <em>IEEE Trans. Power Delivery</em>.</span>'
-    }
-];
-
-// =====================================================================
-// RECENT DOCUMENTS LIST & MULTI-TAB SYSTEM STATE
-// =====================================================================
-let hubDocuments = [
-    {
-        id: 'demo-arc-fault',
-        title: 'Demo File',
-        fullTitle: 'Arc fault detection using artificial intelligence: Challenges and benefits',
-        isDemo: true,
-        pageCount: 29,
-        sentences: readerSentenceData
-    }
-];
-
-let openTabs = [
-    {
-        id: 'demo-arc-fault',
-        title: 'Demo File',
-        fullTitle: 'Arc fault detection using artificial intelligence: Challenges and benefits',
-        isDemo: true,
-        sentences: readerSentenceData,
-        activeSentenceIdx: 1,
-        pageCount: 29
-    }
-];
-
-let activeTabId = 'demo-arc-fault';
+let hubDocuments = [];
+let openTabs = [];
+let activeTabId = null;
 let isRecentGridExpanded = true;
 let currentReaderLang = 'en';
 
@@ -696,8 +507,13 @@ function renderHubDocuments() {
     const listContainer = document.getElementById('hub-dynamic-docs-list');
     if (!listContainer) return;
 
+    if (hubDocuments.length === 0) {
+        listContainer.innerHTML = '';
+        return;
+    }
+
     listContainer.innerHTML = hubDocuments.map((doc) => `
-        <div class="flex flex-col items-center w-full group cursor-pointer touch-manipulation" onclick="openSmartReader('${doc.title.replace(/'/g, "\\'")}')">
+        <div class="flex flex-col items-center w-full group cursor-pointer touch-manipulation" onclick="openSmartReader('${doc.id}')">
             <!-- Miniature Paper Thumbnail (Aspect 175/225 responsive, touch target >= 44x44px) -->
             <div class="w-full aspect-[175/225] min-h-[190px] sm:min-h-[225px] rounded-[14px] bg-white p-3 sm:p-3.5 text-[#111827] shadow-md border border-transparent group-hover:ring-2 group-hover:ring-readitGreen active:scale-[0.98] transition-all overflow-hidden flex flex-col justify-between select-none">
                 <div>
@@ -724,12 +540,12 @@ function renderHubDocuments() {
 
                     <!-- Miniature Abstract Block -->
                     <div class="text-[4.2px] sm:text-[5.2px] text-neutral-800 leading-[1.34] text-justify font-serifPaper line-clamp-5 sm:line-clamp-6">
-                        <strong>Preview:</strong> ${doc.sentences && doc.sentences[0] ? doc.sentences[0].orig.replace(/^"|"$/g, '') : 'Interactive academic manuscript prepared for sentence-by-sentence analysis.'}
+                        <strong>Document Ready:</strong> Real-time PDF rendering with interactive lexical deconstruction and anti-hallucination paper context.
                     </div>
                 </div>
 
                 <div class="border-t border-neutral-800 pt-1 text-[3.8px] sm:text-[4.8px] text-neutral-700 font-serifPaper truncate">
-                    <strong>Format:</strong> PDF • Multi-tab Reader Enabled
+                    <strong>Format:</strong> PDF • Smart Reader Enabled
                 </div>
             </div>
 
@@ -766,8 +582,7 @@ function handlePdfFiles(fileList) {
 
     if (!isLoggedIn) {
         pendingUploadFiles = files;
-        openAuthModal('signin', 'Please sign in to upload and analyze your PDF documents.');
-        return;
+        showHubToast('Opened in Guest Mode — Sign in anytime to sync to cloud');
     }
 
     const validFiles = [];
@@ -789,10 +604,6 @@ function handlePdfFiles(fileList) {
 
 // "+ New File" Button / Drop Card Trigger
 function triggerNewFilePicker() {
-    if (!isLoggedIn) {
-        openAuthModal('signin', 'Please sign in to upload your research documents.');
-        return;
-    }
     const input = document.getElementById('hub-pdf-upload-input');
     if (input) input.click();
 }
@@ -864,141 +675,27 @@ function initGlobalDragAndDrop() {
 }
 
 // =====================================================================
-// PDF.JS PARSER & CUSTOM DOCUMENT GENERATOR
+// DIRECT CLIENT-SIDE PDF IMPORT & OPENING (NO BACKEND PARSE)
 // =====================================================================
-async function processAndOpenPdf(file) {
+function processAndOpenPdf(file) {
     const cleanTitle = file.name.replace(/\.pdf$/i, '');
-    showHubToast(`Reading "${cleanTitle}"...`);
-
-    let extractedSentences = [];
-    let pageCount = 1;
-
-    try {
-        if (window.pdfjsLib) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            pageCount = pdf.numPages;
-
-            let fullText = '';
-            const pagesToRead = Math.min(pdf.numPages, 10);
-            for (let i = 1; i <= pagesToRead; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                const pageStr = content.items.map(it => it.str).join(' ');
-                fullText += pageStr + ' ';
-            }
-
-            // Split into sentences
-            const rawSentences = fullText
-                .replace(/\s+/g, ' ')
-                .match(/[^.!?]+[.!?]+(?:\s|$)/g) || [];
-
-            const cleanSentences = rawSentences
-                .map(s => s.trim())
-                .filter(s => s.length > 25 && !s.match(/^[0-9\s.,-]+$/));
-
-            if (cleanSentences.length > 0) {
-                extractedSentences = cleanSentences.slice(0, 30).map((s, idx) => {
-                    return generateSentenceBreakdown(s, idx + 1);
-                });
-            }
-        }
-    } catch (err) {
-        console.warn('PDF.js reading error, fallback mode activated:', err);
-    }
-
-    if (extractedSentences.length === 0) {
-        extractedSentences = [
-            {
-                badge: `DOCUMENT • ${cleanTitle.toUpperCase()}`,
-                orig: `"${cleanTitle} has been loaded into your smart reading workspace."`,
-                en: `"This document contains ${pageCount} page(s). Click any sentence to view plain-language simplifications and resolved passive voice structures."`,
-                id: `"Dokumen ini memuat ${pageCount} halaman. Klik kalimat mana saja untuk melihat terjemahan dan penjelasan ringkas dalam Bahasa Indonesia."`,
-                extra: `<span class="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px]">PDF Loaded • ${pageCount} Pages • Under 20MB</span>`
-            }
-        ];
-    }
-
+    const fileUrl = URL.createObjectURL(file);
     const docId = 'doc-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
+
     const newDoc = {
         id: docId,
-        title: cleanTitle,
+        title: cleanTitle.length > 36 ? cleanTitle.substring(0, 33) + '...' : cleanTitle,
         fullTitle: file.name,
-        isDemo: false,
+        fileUrl: fileUrl,
         file: file,
-        pageCount: pageCount,
-        sentences: extractedSentences,
-        activeSentenceIdx: 0
+        pageCount: 1
     };
 
-    // Insert into Recent Documents grid at slot 2
     hubDocuments.unshift(newDoc);
     renderHubDocuments();
 
-    // Open as an active tab in the multi-tab system
     openDocumentInTab(newDoc);
-    showHubToast(`Opened "${cleanTitle}" in new tab`);
-}
-
-function generateSentenceBreakdown(sentence, number) {
-    const numPad = String(number).padStart(2, '0');
-    const hasPassive = /\b(was|were|is|are|been|being)\s+([a-z]+ed|[a-z]+en)\b/i.test(sentence);
-
-    const academicWords = [
-        'utilize', 'exhibit', 'facilitate', 'concomitant', 'paucity', 'proliferation',
-        'demonstrate', 'investigate', 'significant', 'preliminary', 'empirical', 'methodology',
-        'comprehensive', 'delineate', 'synthesize', 'furthermore', 'subsequently'
-    ];
-    const hitKeywords = academicWords.filter(k => new RegExp('\\b' + k, 'i').test(sentence));
-
-    let badge = `SENTENCE ${numPad} • `;
-    if (hasPassive && hitKeywords.length > 0) {
-        badge += 'PASSIVE VOICE + LEXICAL HIT';
-    } else if (hasPassive) {
-        badge += 'PASSIVE VOICE QUICK REFERENCE';
-    } else if (hitKeywords.length > 0) {
-        badge += 'TRANSLATING IDEA + LEXICAL HIT';
-    } else {
-        badge += 'TRANSLATING IDEA';
-    }
-
-    let extraHtml = '';
-    if (hasPassive) {
-        extraHtml += `<span class="px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 text-[11px]"><strong>Passive Voice</strong> → Click 'Ask Gemini AI' to resolve actor</span> `;
-    }
-    if (hitKeywords.length > 0) {
-        extraHtml += hitKeywords.map(k => `<span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30 text-[11px]"><strong>${k}</strong> (Academic)</span>`).join(' ');
-    }
-    if (!extraHtml) {
-        extraHtml = `<span class="text-neutral-400 text-[11px]">Click 'Ask Gemini AI' for deep conceptual analysis</span>`;
-    }
-
-    return {
-        badge: badge,
-        orig: `"${sentence}"`,
-        en: `"${simplifyAcademicEnglish(sentence)}"`,
-        id: `"${translateToBahasa(sentence)}"`,
-        extra: extraHtml
-    };
-}
-
-function simplifyAcademicEnglish(sentence) {
-    return sentence
-        .replace(/\bconcomitant\b/gi, 'simultaneous')
-        .replace(/\bpaucity\b/gi, 'severe shortage')
-        .replace(/\bproliferation\b/gi, 'rapid growth')
-        .replace(/\bexhibited\b/gi, 'demonstrated')
-        .replace(/\butilize\b/gi, 'use')
-        .replace(/\bfacilitate\b/gi, 'help')
-        .replace(/\bnecessitating\b/gi, 'requiring')
-        .replace(/\billuminating\b/gi, 'explaining')
-        .replace(/\bmeticulous\b/gi, 'careful')
-        .replace(/\bnonetheless\b/gi, 'however');
-}
-
-function translateToBahasa(sentence) {
-    const simplified = simplifyAcademicEnglish(sentence);
-    return `Terjemahan & Penjelasan: ${simplified.slice(0, 140)}... (Klik 'Ask Gemini AI' untuk penjelasan mendalam)`;
+    showHubToast(`Loaded "${newDoc.title}" in Smart Reader`);
 }
 
 // =====================================================================
@@ -1045,9 +742,7 @@ function togglePaperSwitcherDrawer(openState) {
     }
 }
 
-// =====================================================================
-// DRAWER PAPERS LIST (MOBILE VIEW WITH DRAG & DROP REORDERING)
-// =====================================================================
+// Drawer Papers List (Mobile View with Drag & Drop Reordering)
 let drawerTouchDragId = null;
 let drawerTouchTargetId = null;
 let drawerTouchInsertBefore = false;
@@ -1072,7 +767,7 @@ function renderDrawerPapersList() {
                  ondragend="handleDrawerDragEnd(event)"
                  class="drawer-paper-item flex items-center justify-between p-2 rounded-xl ${isActive ? 'bg-white/[0.12] border-readitGreen/60' : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'} border min-h-[48px] transition-all select-none relative">
                 
-                <!-- Touch & Mouse Drag Handle -->
+                <!-- Drag Handle -->
                 <div class="drawer-drag-handle p-2 min-w-[36px] min-h-[44px] flex items-center justify-center text-white/40 hover:text-white/80 active:text-readitGreen cursor-grab active:cursor-grabbing touch-none shrink-0" 
                      title="Touch and drag to reorder index">
                     <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -1094,7 +789,7 @@ function renderDrawerPapersList() {
                             <span class="truncate">${tab.title}</span>
                             <span class="text-[9px] font-monoFeature px-1.5 py-0.5 rounded bg-white/10 text-white/60 shrink-0">#${idx + 1}</span>
                         </div>
-                        <div class="text-[10px] text-white/50">${tab.pageCount || 1} Pages • ${tab.isDemo ? 'Interactive Demo' : 'PDF Document'}</div>
+                        <div class="text-[10px] text-white/50">${tab.pageCount || 1} Pages • PDF Document</div>
                     </div>
                 </button>
 
@@ -1115,109 +810,67 @@ function attachDrawerTouchListeners() {
     const list = document.getElementById('drawer-papers-list');
     if (!list) return;
 
-    const items = list.querySelectorAll('.drawer-paper-item');
-    items.forEach((item) => {
-        const handle = item.querySelector('.drawer-drag-handle');
-        if (!handle) return;
+    list.querySelectorAll('.drawer-drag-handle').forEach(handle => {
+        handle.ontouchstart = (e) => {
+            const item = handle.closest('.drawer-paper-item');
+            if (!item) return;
+            drawerTouchDragId = item.getAttribute('data-tab-id');
+            item.classList.add('is-touch-dragging');
+        };
 
-        handle.addEventListener('touchstart', onDrawerTouchStart, { passive: false });
-        handle.addEventListener('touchmove', onDrawerTouchMove, { passive: false });
-        handle.addEventListener('touchend', onDrawerTouchEnd, { passive: false });
-        handle.addEventListener('touchcancel', onDrawerTouchCancel, { passive: false });
-    });
-}
+        handle.ontouchmove = (e) => {
+            if (!drawerTouchDragId) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (!targetElement) return;
 
-function onDrawerTouchStart(e) {
-    const item = e.currentTarget.closest('.drawer-paper-item');
-    if (!item) return;
+            const targetItem = targetElement.closest('.drawer-paper-item');
+            cleanupDrawerDragClasses();
 
-    drawerTouchDragId = item.dataset.tabId;
-    drawerTouchTargetId = null;
-    drawerTouchInsertBefore = false;
+            if (targetItem) {
+                targetItem.classList.add('is-touch-dragging');
+                const targetRect = targetItem.getBoundingClientRect();
+                const midPoint = targetRect.top + targetRect.height / 2;
+                drawerTouchTargetId = targetItem.getAttribute('data-tab-id');
+                drawerTouchInsertBefore = touch.clientY < midPoint;
 
-    item.classList.add('is-touch-dragging');
-    if (navigator.vibrate) {
-        try { navigator.vibrate(25); } catch (err) {}
-    }
-}
-
-function onDrawerTouchMove(e) {
-    if (!drawerTouchDragId) return;
-    e.preventDefault();
-
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const targetItem = el ? el.closest('.drawer-paper-item') : null;
-
-    // Remove drag lines from all items
-    document.querySelectorAll('.drawer-paper-item').forEach(it => {
-        if (it !== targetItem) {
-            it.classList.remove('drag-over-top', 'drag-over-bottom');
-        }
-    });
-
-    if (targetItem && targetItem.dataset.tabId !== drawerTouchDragId) {
-        drawerTouchTargetId = targetItem.dataset.tabId;
-        const rect = targetItem.getBoundingClientRect();
-        const midPoint = rect.top + rect.height / 2;
-
-        if (touch.clientY < midPoint) {
-            targetItem.classList.add('drag-over-top');
-            targetItem.classList.remove('drag-over-bottom');
-            drawerTouchInsertBefore = true;
-        } else {
-            targetItem.classList.add('drag-over-bottom');
-            targetItem.classList.remove('drag-over-top');
-            drawerTouchInsertBefore = false;
-        }
-    } else {
-        drawerTouchTargetId = null;
-    }
-}
-
-function onDrawerTouchEnd(e) {
-    if (drawerTouchDragId && drawerTouchTargetId && drawerTouchDragId !== drawerTouchTargetId) {
-        const fromIdx = openTabs.findIndex(t => t.id === drawerTouchDragId);
-        const toIdx = openTabs.findIndex(t => t.id === drawerTouchTargetId);
-
-        if (fromIdx !== -1 && toIdx !== -1) {
-            const [movedTab] = openTabs.splice(fromIdx, 1);
-            let targetIdx = openTabs.findIndex(t => t.id === drawerTouchTargetId);
-            if (!drawerTouchInsertBefore) {
-                targetIdx += 1;
+                if (drawerTouchInsertBefore) {
+                    targetItem.classList.add('drag-over-top');
+                } else {
+                    targetItem.classList.add('drag-over-bottom');
+                }
             }
-            targetIdx = Math.max(0, Math.min(openTabs.length, targetIdx));
-            openTabs.splice(targetIdx, 0, movedTab);
+        };
 
-            renderReaderTabs();
-            showHubToast(`Moved "${movedTab.title}" to position #${targetIdx + 1}`);
-        }
-    }
-
-    cleanupDrawerDragClasses();
-    drawerTouchDragId = null;
-    drawerTouchTargetId = null;
-}
-
-function onDrawerTouchCancel(e) {
-    cleanupDrawerDragClasses();
-    drawerTouchDragId = null;
-    drawerTouchTargetId = null;
+        handle.ontouchend = () => {
+            if (drawerTouchDragId && drawerTouchTargetId && drawerTouchDragId !== drawerTouchTargetId) {
+                const fromIdx = openTabs.findIndex(t => t.id === drawerTouchDragId);
+                const toIdx = openTabs.findIndex(t => t.id === drawerTouchTargetId);
+                if (fromIdx !== -1 && toIdx !== -1) {
+                    const [movedTab] = openTabs.splice(fromIdx, 1);
+                    let targetIdx = openTabs.findIndex(t => t.id === drawerTouchTargetId);
+                    if (!drawerTouchInsertBefore) targetIdx += 1;
+                    targetIdx = Math.max(0, Math.min(openTabs.length, targetIdx));
+                    openTabs.splice(targetIdx, 0, movedTab);
+                    renderReaderTabs();
+                }
+            }
+            cleanupDrawerDragClasses();
+            drawerTouchDragId = null;
+            drawerTouchTargetId = null;
+        };
+    });
 }
 
 function handleDrawerDragStart(event, tabId) {
     drawerDraggedTabId = tabId;
     event.dataTransfer.setData('text/plain', tabId);
     event.dataTransfer.effectAllowed = 'move';
-    const el = document.getElementById(`drawer-paper-item-${tabId}`);
-    if (el) {
-        requestAnimationFrame(() => el.classList.add('is-touch-dragging'));
-    }
 }
 
 function handleDrawerDragOver(event, targetTabId) {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
     if (!drawerDraggedTabId || drawerDraggedTabId === targetTabId) return;
 
     const targetEl = document.getElementById(`drawer-paper-item-${targetTabId}`);
@@ -1225,6 +878,7 @@ function handleDrawerDragOver(event, targetTabId) {
 
     const rect = targetEl.getBoundingClientRect();
     const midPoint = rect.top + rect.height / 2;
+
     if (event.clientY < midPoint) {
         targetEl.classList.add('drag-over-top');
         targetEl.classList.remove('drag-over-bottom');
@@ -1240,9 +894,7 @@ function handleDrawerDragEnter(event, targetTabId) {
 
 function handleDrawerDragLeave(event, targetTabId) {
     const targetEl = document.getElementById(`drawer-paper-item-${targetTabId}`);
-    if (targetEl) {
-        targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
-    }
+    if (targetEl) targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
 }
 
 function handleDrawerDrop(event, targetTabId) {
@@ -1251,7 +903,6 @@ function handleDrawerDrop(event, targetTabId) {
 
     const targetEl = document.getElementById(`drawer-paper-item-${targetTabId}`);
     const insertBefore = targetEl && targetEl.classList.contains('drag-over-top');
-
     cleanupDrawerDragClasses();
 
     if (!drawerDraggedTabId || drawerDraggedTabId === targetTabId) {
@@ -1260,13 +911,12 @@ function handleDrawerDrop(event, targetTabId) {
     }
 
     const fromIdx = openTabs.findIndex(t => t.id === drawerDraggedTabId);
-    const toIdx = openTabs.findIndex(t => t.id === targetTabId);
+    let toIdx = openTabs.findIndex(t => t.id === targetTabId);
+
     if (fromIdx !== -1 && toIdx !== -1) {
         const [movedTab] = openTabs.splice(fromIdx, 1);
         let targetIdx = openTabs.findIndex(t => t.id === targetTabId);
-        if (!insertBefore) {
-            targetIdx += 1;
-        }
+        if (!insertBefore) targetIdx += 1;
         targetIdx = Math.max(0, Math.min(openTabs.length, targetIdx));
         openTabs.splice(targetIdx, 0, movedTab);
 
@@ -1293,7 +943,6 @@ function cleanupDrawerDragClasses() {
 function renderReaderTabs() {
     const activeTab = openTabs.find(t => t.id === activeTabId) || openTabs[0];
 
-    // Synchronize Mobile Paper Switcher Button display
     const mobileTitle = document.getElementById('mobile-active-paper-title');
     if (mobileTitle && activeTab) {
         mobileTitle.textContent = activeTab.title;
@@ -1307,13 +956,11 @@ function renderReaderTabs() {
         drawerCounter.textContent = `${openTabs.length} paper${openTabs.length === 1 ? '' : 's'} open`;
     }
 
-    // Always keep drawer list up-to-date
     renderDrawerPapersList();
 
     const tabsBar = document.getElementById('reader-tabs-bar');
     if (!tabsBar) return;
 
-    // Render open tabs
     const tabsHtml = openTabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         return `
@@ -1339,7 +986,6 @@ function renderReaderTabs() {
         `;
     }).join('');
 
-    // Append desktop '+' button sticking directly to the rightmost index of opened files
     const desktopPlusBtnHtml = `
         <button onclick="triggerNewFilePicker()" 
                 id="desktop-new-tab-btn"
@@ -1418,12 +1064,9 @@ function handleTabDrop(event, targetTabId) {
         return;
     }
 
-    // Reorder underlying openTabs state array cleanly
     const [movedTab] = openTabs.splice(fromIndex, 1);
     let targetIndexAfterRemoval = openTabs.findIndex(t => t.id === targetTabId);
-    if (!insertBefore) {
-        targetIndexAfterRemoval += 1;
-    }
+    if (!insertBefore) targetIndexAfterRemoval += 1;
     const finalIndex = Math.max(0, Math.min(openTabs.length, targetIndexAfterRemoval));
     openTabs.splice(finalIndex, 0, movedTab);
 
@@ -1441,7 +1084,6 @@ function cleanupTabDragClasses() {
         tab.classList.remove('is-dragging', 'drag-over-left', 'drag-over-right');
     });
 }
-
 
 function navigateNextTab(backward = false) {
     if (!openTabs || openTabs.length <= 1) return;
@@ -1477,6 +1119,7 @@ function closeReaderTab(event, tabId) {
     openTabs.splice(idx, 1);
 
     if (openTabs.length === 0) {
+        activeTabId = null;
         closeSmartReader();
         return;
     }
@@ -1499,9 +1142,8 @@ function openDocumentInTab(doc) {
             id: doc.id,
             title: doc.title,
             fullTitle: doc.fullTitle || doc.title,
-            isDemo: !!doc.isDemo,
-            sentences: doc.sentences || readerSentenceData,
-            activeSentenceIdx: 0,
+            fileUrl: doc.fileUrl,
+            file: doc.file,
             pageCount: doc.pageCount || 1
         });
         activeTabId = doc.id;
@@ -1523,18 +1165,9 @@ function openDocumentInTab(doc) {
     setReaderLang(currentReaderLang);
 }
 
-function openSmartReader(docTitle) {
-    let targetDoc = hubDocuments.find(d => d.title.toLowerCase() === docTitle.toLowerCase());
-    if (!targetDoc) {
-        targetDoc = {
-            id: 'doc-' + Date.now(),
-            title: docTitle,
-            fullTitle: docTitle,
-            isDemo: docTitle === 'Demo File',
-            pageCount: 1,
-            sentences: readerSentenceData
-        };
-    }
+function openSmartReader(docIdentifier) {
+    let targetDoc = hubDocuments.find(d => d.id === docIdentifier || d.title.toLowerCase() === docIdentifier.toLowerCase());
+    if (!targetDoc) return;
     openDocumentInTab(targetDoc);
 }
 
@@ -1553,287 +1186,1025 @@ function closeSmartReader() {
     if (mobileHeader) mobileHeader.classList.remove('hidden');
 }
 
-// =====================================================================
-// DYNAMIC DOCUMENT SHEET & SENTENCE ACCORDION
-// =====================================================================
 function renderActiveTabDocument() {
     const tab = openTabs.find(t => t.id === activeTabId);
-    if (!tab) return;
-
-    const paperSheet = document.getElementById('reader-paper-sheet');
-    if (!paperSheet) return;
-
-    if (tab.isDemo) {
-        // Render classic Demo Paper layout
-        paperSheet.innerHTML = `
-            <!-- Journal Top Header -->
-            <div class="flex flex-col sm:flex-row sm:items-start justify-between pb-4 mb-5 border-b-2 border-neutral-800 gap-4">
-                <div class="space-y-1.5">
-                    <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-full border border-[#0284C7] flex items-center justify-center relative overflow-hidden shrink-0 text-[#0284C7]">
-                            <svg class="w-10 h-10 opacity-85" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.1">
-                                <circle cx="20" cy="20" r="16"/>
-                                <ellipse cx="20" cy="20" rx="8" ry="16"/>
-                                <line x1="4" y1="14" x2="36" y2="14"/>
-                                <line x1="4" y1="20" x2="36" y2="20"/>
-                                <line x1="4" y1="26" x2="36" y2="26"/>
-                            </svg>
-                            <span class="absolute bg-white px-1 font-sans font-black text-[9px] tracking-tighter text-[#0369A1]">AIMS</span>
-                        </div>
-                        <div class="text-[#0284C7] italic text-[14px] leading-snug">
-                            <div>Mathematical Biosciences</div>
-                            <div>and Engineering</div>
-                        </div>
-                    </div>
-                    <div class="text-[10.5px] text-neutral-600">http://www.aimspress.com/journal/mbe</div>
-                </div>
-                <div class="text-[10.5px] text-neutral-800 leading-[1.45]">
-                    <div>MBE, 20(7): 12404–12432.</div>
-                    <div>DOI: 10.3934/mbe.2023552</div>
-                    <div>May 2023</div>
-                </div>
-            </div>
-
-            <!-- Paper Title, Authors & Affiliations -->
-            <div class="mb-5 space-y-2">
-                <div class="italic text-xs text-neutral-700">Review</div>
-                <h1 id="reader-paper-heading" class="font-bold text-xl sm:text-[21px] text-black leading-[1.3]">
-                    Arc fault detection using artificial intelligence: Challenges and benefits
-                </h1>
-                <div class="font-bold text-[13px] text-black">
-                    Chunpeng Tian<sup>1</sup>, Zhaoyang Xu<sup>2</sup>, Lukun Wang<sup>1</sup> and Yunjie Liu<sup>3,</sup>*
-                </div>
-                <div class="text-[11px] text-neutral-700 leading-[1.45] space-y-0.5 pt-0.5">
-                    <div><sup>1</sup> College of Intelligent Equipment, Shandong University of Science and Technology, Taian 271019, China</div>
-                    <div><sup>2</sup> University of Cambridge, Wellcome-MRC Cambridge Stem Cell Institute, Cambridge, England</div>
-                </div>
-            </div>
-
-            <!-- Interactive Abstract -->
-            <div class="text-[14.5px] text-neutral-900 leading-[1.8] text-justify space-y-3">
-                <div>
-                    <span class="font-bold text-black">Abstract: </span>
-                    <span onclick="selectReaderSentence(0)" id="rsent-0" class="readit-sentence">This systematic review aims to investigate recent developments in the area of arc fault detection.</span>
-                    <span onclick="selectReaderSentence(1)" id="rsent-1" class="readit-sentence active-sentence">The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults and the likelihood of related fires, presenting a matter of considerable concern.</span>
-                    <span onclick="selectReaderSentence(2)" id="rsent-2" class="readit-sentence">To address this challenge, this review focuses on the role of artificial intelligence (AI) in arc fault detection, with the objective of illuminating its advantages and identifying current limitations.</span>
-                    <span onclick="selectReaderSentence(3)" id="rsent-3" class="readit-sentence">Through a meticulous literature selection process, a total of 63 articles were included in the final analysis.</span>
-                    <span onclick="selectReaderSentence(4)" id="rsent-4" class="readit-sentence">Simultaneously, three major challenges were also identified, including missed and false detections, the restricted application of neural networks and the paucity of relevant data.</span>
-                    <span onclick="selectReaderSentence(5)" id="rsent-5" class="readit-sentence">In conclusion, AI has exhibited tremendous potential for transforming the field of arc fault detection and holds substantial promise for enhancing electrical safety.</span>
-                </div>
-
-                <!-- Dynamic Inline Before / After Guide Accordion -->
-                ${renderInlineGuideMarkup()}
-
-                <div class="pt-1 pb-3 border-b-2 border-neutral-800 text-[12px] text-neutral-900">
-                    <span class="font-bold">Keywords:</span> arc fault detection; artificial intelligence; detection methods; arc fault location; electric fire
-                </div>
-
-                <!-- Section 1: Introduction -->
-                <div class="pt-2">
-                    <div class="font-bold text-black text-[13.5px] mb-1.5">1. Introduction</div>
-                    <p class="indent-6">
-                        <span onclick="selectReaderSentence(6)" id="rsent-6" class="readit-sentence">The proliferation of urbanization and industrialization has resulted in a surging demand for energy, necessitating the development of new and efficient energy systems.</span>
-                        <span onclick="selectReaderSentence(7)" id="rsent-7" class="readit-sentence">Nonetheless, the outdated nature of current photovoltaic and energy storage systems has given rise to numerous incidents of arc faults [1].</span>
-                    </p>
-                </div>
-            </div>
-        `;
-    } else {
-        // Render Custom Uploaded PDF Paper Layout
-        const sentences = tab.sentences || [];
-        paperSheet.innerHTML = `
-            <!-- Custom PDF Top Header -->
-            <div class="flex flex-col sm:flex-row sm:items-start justify-between pb-4 mb-5 border-b-2 border-neutral-800 gap-4">
-                <div class="space-y-1.5">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-readitGreen/15 border border-readitGreen/40 flex items-center justify-center shrink-0 text-readitGreen font-mono font-bold text-xs">
-                            PDF
-                        </div>
-                        <div>
-                            <div class="text-sm font-bold text-black leading-tight">${tab.title}</div>
-                            <div class="text-[11px] text-neutral-600 font-monoFeature">Manuscript Reader • ${tab.pageCount} Pages (&lt;20MB)</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="text-[11px] text-neutral-700 leading-snug sm:text-right">
-                    <span class="px-2.5 py-1 rounded-full bg-neutral-100 border border-neutral-300 font-medium">Interactive Sentences: ${sentences.length}</span>
-                </div>
-            </div>
-
-            <!-- Paper Title & Info -->
-            <div class="mb-5 space-y-1">
-                <div class="italic text-xs text-neutral-600">Uploaded Document</div>
-                <h1 class="font-bold text-xl sm:text-[21px] text-black leading-[1.3]">
-                    ${tab.fullTitle || tab.title}
-                </h1>
-            </div>
-
-            <!-- Interactive Sentences Block -->
-            <div class="text-[14.5px] text-neutral-900 leading-[1.8] text-justify space-y-3">
-                <div class="space-y-2">
-                    ${sentences.map((s, idx) => `
-                        <span onclick="selectReaderSentence(${idx})" id="rsent-${idx}" class="readit-sentence ${idx === tab.activeSentenceIdx ? 'active-sentence' : ''}">
-                            ${s.orig.replace(/^"|"$/g, '')}
-                        </span>
-                    `).join(' ')}
-                </div>
-
-                <!-- Dynamic Inline Before / After Guide Accordion -->
-                ${renderInlineGuideMarkup()}
-            </div>
-        `;
+    if (!tab) {
+        const emptyState = document.getElementById('empty-state');
+        if (emptyState) emptyState.classList.remove('hidden');
+        const pdfContainer = document.getElementById('pdf-page-container');
+        if (pdfContainer) pdfContainer.classList.add('hidden');
+        const pageNav = document.getElementById('page-nav');
+        if (pageNav) pageNav.classList.add('hidden');
+        resetInspector();
+        return;
     }
 
-    selectReaderSentence(tab.activeSentenceIdx || 0);
-}
-
-function renderInlineGuideMarkup() {
-    return `
-        <div id="reader-inline-guide" class="font-sans text-left pt-2 pb-1">
-            <div class="rounded-2xl bg-[#161B18] text-white p-5 sm:p-6 border border-readitGreen/50 shadow-xl space-y-4">
-                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-readitGreen"></span>
-                        <span id="rguide-badge" class="text-[11px] font-monoFeature uppercase tracking-wider text-readitGreen font-semibold">
-                            SENTENCE 01 • TRANSLATING IDEA
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <button onclick="requestGeminiLensForSentence()" id="ask-gemini-btn" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.08] hover:bg-readitGreen hover:text-black border border-white/15 text-white text-[11px] font-medium transition focus:outline-none" title="Request live conceptual analysis from Gemini AI">
-                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-                            <span>Ask Gemini AI</span>
-                        </button>
-                        <span class="text-[11px] text-neutral-400 hidden sm:inline">Click any sentence to switch</span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
-                        <div class="text-[10px] font-monoFeature uppercase text-amber-300">Before (Selected Sentence)</div>
-                        <p id="rguide-before" class="text-xs text-neutral-300 italic leading-relaxed">
-                            "Sentence preview..."
-                        </p>
-                    </div>
-                    <div class="p-3.5 rounded-xl bg-readitGreen/10 border border-readitGreen/35 space-y-1">
-                        <div class="text-[10px] font-monoFeature uppercase text-readitGreen" id="rguide-after-label">After (READit Plain Breakdown)</div>
-                        <p id="rguide-after" class="text-xs sm:text-[13px] text-white font-medium leading-relaxed">
-                            "Simplified breakdown..."
-                        </p>
-                    </div>
-                </div>
-
-                <div id="rguide-extra" class="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-[11px]">
-                    <span class="text-neutral-400">Detected Terms:</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function selectReaderSentence(idx) {
-    const tab = openTabs.find(t => t.id === activeTabId);
-    if (!tab || !tab.sentences) return;
-
-    tab.activeSentenceIdx = idx;
-
-    for (let i = 0; i < tab.sentences.length; i++) {
-        const el = document.getElementById(`rsent-${i}`);
-        if (!el) continue;
-        if (i === idx) {
-            el.classList.add('active-sentence');
-        } else {
-            el.classList.remove('active-sentence');
-        }
+    if (tab.fileUrl) {
+        loadPdfDocument(tab.fileUrl);
     }
-
-    const item = tab.sentences[idx];
-    if (!item) return;
-
-    const badge = document.getElementById('rguide-badge');
-    const before = document.getElementById('rguide-before');
-    const after = document.getElementById('rguide-after');
-    const extra = document.getElementById('rguide-extra');
-
-    if (badge) badge.textContent = item.badge;
-    if (before) before.textContent = item.orig;
-    if (after) after.textContent = currentReaderLang === 'en' ? item.en : item.id;
-    if (extra) extra.innerHTML = item.extra;
 }
 
-function setReaderLang(lang) {
-    currentReaderLang = lang;
+// =====================================================================
+// PDF.JS RENDERING ENGINE & ANTI-HALLUCINATION CONTEXT
+// =====================================================================
+window.READIT_SYSTEM = {
+    selectedText: null,
+    pendingSelection: null,
+    activeCard: false,
+    activeCardData: null,
+    paperContext: null,
+    currentPage: 1,
+    currentLang: 'en',
+    activeFeature: 'translating_idea',
+    featureCache: {},
+    copyPayloads: {}
+};
 
-    // Synchronize Desktop Top Bar language buttons
-    const btnEn = document.getElementById('reader-lang-en');
-    const btnId = document.getElementById('reader-lang-id');
-    if (btnEn && btnId) {
-        if (lang === 'en') {
-            btnEn.className = "px-3 py-1 rounded-full bg-readitGreen text-black font-semibold transition";
-            btnId.className = "px-3 py-1 rounded-full text-white/60 hover:text-white transition";
-        } else {
-            btnId.className = "px-3 py-1 rounded-full bg-readitGreen text-black font-semibold transition";
-            btnEn.className = "px-3 py-1 rounded-full text-white/60 hover:text-white transition";
-        }
+let currentPdf = null;
+let currentPageNum = 1;
+let totalPages = 1;
+let currentRenderTask = null;
+let currentTextLayerTask = null;
+let resizeDebounceTimer = null;
+
+async function prebakePaperContext(pdfDoc) {
+    const pill = document.getElementById('paper-context-pill');
+    const dot = document.getElementById('context-status-dot');
+    const label = document.getElementById('context-status-label');
+    
+    if (pill) {
+        pill.classList.remove('hidden');
+        pill.classList.add('flex');
     }
-
-    // Synchronize Sleek Floating Bottom Action Bar buttons (>= 44x44px touch targets)
-    const floatEn = document.getElementById('floating-lang-en');
-    const floatId = document.getElementById('floating-lang-id');
-    if (floatEn && floatId) {
-        if (lang === 'en') {
-            floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
-            floatId.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation";
-        } else {
-            floatId.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
-            floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation";
-        }
-    }
-
-    const tab = openTabs.find(t => t.id === activeTabId);
-    selectReaderSentence(tab ? tab.activeSentenceIdx || 0 : 0);
-}
-
-// Live Gemini AI Call for Current Active Sentence
-async function requestGeminiLensForSentence() {
-    const tab = openTabs.find(t => t.id === activeTabId);
-    if (!tab || !tab.sentences) return;
-    const item = tab.sentences[tab.activeSentenceIdx || 0];
-    if (!item) return;
-
-    const afterEl = document.getElementById('rguide-after');
-    const extraEl = document.getElementById('rguide-extra');
-    if (!afterEl) return;
-
-    const prevAfter = afterEl.textContent;
-    afterEl.innerHTML = `<span class="inline-flex items-center gap-2 text-readitGreen"><span class="animate-spin text-sm">⏳</span> Asking Gemini AI...</span>`;
+    if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0';
+    if (label) label.textContent = 'Context: Indexing...';
 
     try {
-        const textToAnalyze = item.orig.replace(/^"|"$/g, '');
-        const res = await fetch('/api/lens', {
+        let extractedText = '';
+        const maxPagesToRead = Math.min(pdfDoc.numPages, 4);
+        for (let i = 1; i <= maxPagesToRead; i++) {
+            const page = await pdfDoc.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            extractedText += `\n--- Page ${i} ---\n` + pageText;
+            if (extractedText.length > 12000) break;
+        }
+
+        const activeTab = openTabs.find(t => t.id === activeTabId);
+        const tabTitle = activeTab ? activeTab.title : '';
+
+        const resp = await fetch('/api/context/prebake', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                text: textToAnalyze,
-                lens_type: 'intuition'
+                title: tabTitle,
+                content: extractedText.slice(0, 12000)
             })
         });
 
-        if (!res.ok) throw new Error('API error');
-        const data = await res.json();
-
-        if (data.explanation) {
-            afterEl.innerHTML = data.explanation.replace(/##\s*💡?\s*Core Intuition/i, '').trim();
-            if (extraEl) {
-                extraEl.innerHTML += `<span class="px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30 text-[10px]">✨ Powered by Gemini 2.0 Flash</span>`;
+        if (resp.ok) {
+            const ctx = await resp.json();
+            window.READIT_SYSTEM.paperContext = ctx;
+            if (dot) dot.className = 'w-2 h-2 rounded-full bg-readitGreen shrink-0';
+            if (label) {
+                label.textContent = 'Context: Ready';
+                if (pill) {
+                    pill.title = `Domain: ${ctx.domain || 'N/A'}\nCore Problem: ${ctx.core_problem || 'N/A'}\nMethod: ${ctx.core_method || 'N/A'}`;
+                }
             }
-            showHubToast('Gemini AI explanation generated!');
-        } else {
-            afterEl.textContent = prevAfter;
         }
     } catch (e) {
-        afterEl.textContent = prevAfter;
-        showHubToast('Live AI request completed (Cached fallback active)');
+        console.warn('Paper context prebake failed, fallback active:', e);
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-white/40 shrink-0';
+        if (label) label.textContent = 'Context: Local';
     }
+}
+
+async function loadPdfDocument(urlOrData) {
+    try {
+        const loadingTask = pdfjsLib.getDocument(urlOrData);
+        currentPdf = await loadingTask.promise;
+        totalPages = currentPdf.numPages;
+        currentPageNum = 1;
+
+        const activeTab = openTabs.find(t => t.id === activeTabId);
+        if (activeTab) {
+            activeTab.pageCount = totalPages;
+            renderReaderTabs();
+        }
+
+        const pageNav = document.getElementById('page-nav');
+        if (pageNav) {
+            pageNav.classList.remove('hidden');
+            pageNav.classList.add('flex');
+        }
+
+        const emptyState = document.getElementById('empty-state');
+        if (emptyState) emptyState.classList.add('hidden');
+        const pageContainer = document.getElementById('pdf-page-container');
+        if (pageContainer) pageContainer.classList.remove('hidden');
+
+        // Background context indexing
+        prebakePaperContext(currentPdf);
+
+        await renderPage(currentPageNum);
+    } catch (err) {
+        console.error('Failed to load PDF:', err);
+        showHubToast('Could not open PDF document: ' + err.message);
+    }
+}
+
+async function renderPage(pageNum) {
+    if (!currentPdf) return;
+
+    if (currentRenderTask) {
+        try { currentRenderTask.cancel(); } catch (e) {}
+        currentRenderTask = null;
+    }
+    if (currentTextLayerTask) {
+        try { currentTextLayerTask.cancel(); } catch (e) {}
+        currentTextLayerTask = null;
+    }
+
+    const pageLabel = document.getElementById('page-label');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    if (pageLabel) pageLabel.textContent = `${pageNum} / ${totalPages}`;
+    if (btnPrev) btnPrev.disabled = pageNum <= 1;
+    if (btnNext) btnNext.disabled = pageNum >= totalPages;
+
+    const inspectorMeta = document.getElementById('inspector-meta');
+    if (inspectorMeta) inspectorMeta.textContent = `Page ${pageNum} / ${totalPages}`;
+
+    window.READIT_SYSTEM.currentPage = pageNum;
+    resetInspector();
+
+    const page = await currentPdf.getPage(pageNum);
+    const canvas = document.getElementById('pdf-canvas');
+    const textLayerDiv = document.getElementById('text-layer');
+    const pageContainer = document.getElementById('pdf-page-container');
+    const paperCard = document.getElementById('paper-card');
+    const viewportContainer = document.getElementById('reader-viewport');
+    if (!canvas || !textLayerDiv || !pageContainer || !paperCard || !viewportContainer) return;
+
+    const isLargeScreen = window.innerWidth >= 1024;
+    const inspectorWidth = isLargeScreen ? 380 : 0;
+    const gap = isLargeScreen ? 24 : 0;
+    const padding = window.innerWidth < 640 ? 32 : 64;
+    const availableWidth = viewportContainer.clientWidth - inspectorWidth - gap - padding;
+    const targetWidth = Math.min(820, Math.max(320, availableWidth));
+    const unscaledViewport = page.getViewport({ scale: 1.0 });
+    const layoutScale = targetWidth / unscaledViewport.width;
+    const viewport = page.getViewport({ scale: layoutScale });
+
+    const widthPx = Math.floor(viewport.width);
+    const heightPx = Math.floor(viewport.height);
+
+    pageContainer.style.width = widthPx + 'px';
+    pageContainer.style.height = heightPx + 'px';
+    paperCard.style.width = widthPx + 'px';
+    paperCard.style.minHeight = heightPx + 'px';
+
+    const outputScale = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(widthPx * outputScale);
+    canvas.height = Math.floor(heightPx * outputScale);
+    canvas.style.width = widthPx + 'px';
+    canvas.style.height = heightPx + 'px';
+
+    const ctx = canvas.getContext('2d');
+    const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
+    try {
+        currentRenderTask = page.render({
+            canvasContext: ctx,
+            viewport: viewport,
+            transform: transform
+        });
+        await currentRenderTask.promise;
+    } catch (err) {
+        if (err?.name === 'RenderingCancelledException') return;
+        console.error('Canvas render error:', err);
+        return;
+    } finally {
+        currentRenderTask = null;
+    }
+
+    try {
+        textLayerDiv.innerHTML = '';
+        textLayerDiv.style.width = widthPx + 'px';
+        textLayerDiv.style.height = heightPx + 'px';
+        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+
+        const textContent = await page.getTextContent();
+        currentTextLayerTask = pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container: textLayerDiv,
+            viewport: viewport
+        });
+        await currentTextLayerTask.promise;
+    } catch (err) {
+        if (err?.name === 'AbortException') return;
+        console.error('TextLayer render error:', err);
+    } finally {
+        currentTextLayerTask = null;
+    }
+}
+
+function changePage(delta) {
+    const next = currentPageNum + delta;
+    if (next >= 1 && next <= totalPages) {
+        currentPageNum = next;
+        hideFloatingActions();
+        resetInspector();
+        renderPage(currentPageNum);
+    }
+}
+
+// =====================================================================
+// CITATION DETECTION ENGINE
+// Detects:
+// 1. Bracketed numbers: [1], [2, 3], [1-4], [14, 15]
+// 2. Author citations: (Wang et al), (Wang et al., 2021), (Smith, 2020), [Wang et al., 2021]
+// 3. Superscripts: <sup>1</sup>, <sup>[1]</sup> or unicode ¹, ², ³, ⁴ etc.
+// =====================================================================
+function detectCitations(text) {
+    if (!text || typeof text !== 'string') return [];
+    
+    const numberedRegex = /\[\s*\d+(?:[\s,\-–—]+\d+)*\s*\]/g;
+    const authorYearRegex = /\([A-Z][a-zA-Z\s\.\-&]+,?\s*(?:19|20)\d{2}[a-z]?\)/g;
+    const bracketAuthorYearRegex = /\[[A-Z][a-zA-Z\s\.\-&]+(?:19|20)\d{2}[a-z]?\]/g;
+    const unicodeSupRegex = /[\u00B9\u00B2\u00B3\u2070\u2074-\u2079]+/g;
+
+    const matches = [
+        ...(text.match(numberedRegex) || []),
+        ...(text.match(authorYearRegex) || []),
+        ...(text.match(bracketAuthorYearRegex) || []),
+        ...(text.match(unicodeSupRegex) || [])
+    ];
+    
+    return [...new Set(matches)];
+}
+
+function detectCitationsInText(text, html) {
+    const fromText = detectCitations(text);
+    if (!html) return fromText;
+    const supHtmlRegex = /<sup>\s*(?:\[?\s*\d+(?:[\s,\-–—]+\d+)*\s*\]?|[a-z]+)\s*<\/sup>/gi;
+    const fromHtml = typeof html === 'string' ? (html.match(supHtmlRegex) || []) : [];
+    return [...new Set([...fromText, ...fromHtml])];
+}
+
+// =====================================================================
+// FLOATING ACTIONS BAR (Near Text Selection)
+// =====================================================================
+function positionFloatingActions(hasCitations) {
+    const bar = document.getElementById('floating-actions-bar');
+    if (!bar) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        hideFloatingActions();
+        return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) {
+        hideFloatingActions();
+        return;
+    }
+
+    // Strictly toggle Easy Citation button visibility based on whether citations exist
+    const citBtn = document.getElementById('floating-btn-citation');
+    if (citBtn) {
+        if (hasCitations) {
+            citBtn.classList.remove('hidden');
+            citBtn.classList.add('flex');
+        } else {
+            citBtn.classList.add('hidden');
+            citBtn.classList.remove('flex');
+        }
+    }
+
+    bar.classList.remove('hidden');
+    bar.classList.add('flex');
+
+    const barWidth = bar.offsetWidth || (hasCitations ? 260 : 180);
+    const barHeight = bar.offsetHeight || 36;
+
+    let top = rect.top - barHeight - 8;
+    let left = rect.left + (rect.width / 2) - (barWidth / 2);
+
+    if (top < 60) {
+        top = rect.bottom + 8;
+    }
+    left = Math.max(12, Math.min(window.innerWidth - barWidth - 12, left));
+
+    bar.style.top = `${Math.round(top)}px`;
+    bar.style.left = `${Math.round(left)}px`;
+}
+
+function hideFloatingActions() {
+    const bar = document.getElementById('floating-actions-bar');
+    if (bar) {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+    }
+}
+
+async function handleFloatingFeatureClick(feature, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const data = window.READIT_SYSTEM.pendingSelection;
+    if (!data || !data.isValid || !data.text) return;
+
+    hideFloatingActions();
+
+    // Lock this card as the persistent active card beside paper
+    window.READIT_SYSTEM.activeCard = true;
+    window.READIT_SYSTEM.activeCardData = data;
+    window.READIT_SYSTEM.selectedText = data.text;
+    window.READIT_SYSTEM.featureCache = {};
+
+    updateInspector(data);
+    switchFeatureDrawer(feature);
+}
+
+// =====================================================================
+// REAL-TIME TEXT SELECTION DETECTION & RULES
+// =====================================================================
+function handleSelectionChange() {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const paperCard = document.getElementById('paper-card');
+    if (!paperCard) return;
+
+    if (selection.rangeCount === 0 || selection.isCollapsed) {
+        hideFloatingActions();
+        window.READIT_SYSTEM.pendingSelection = null;
+        // PERSISTENCE RULE: If an active card is already displayed, DO NOT reset inspector!
+        if (!window.READIT_SYSTEM.activeCard) {
+            resetInspector();
+        }
+        return;
+    }
+
+    const anchorNode = selection.anchorNode;
+    const focusNode = selection.focusNode;
+
+    const isInsidePaper = (
+        (anchorNode && paperCard.contains(anchorNode)) ||
+        (focusNode && paperCard.contains(focusNode))
+    );
+
+    if (!isInsidePaper) {
+        hideFloatingActions();
+        return;
+    }
+
+    const rawText = selection.toString();
+    const cleanText = rawText
+        .replace(/([A-Za-z]+)-\s+([A-Za-z]+)/g, '$1$2')
+        .replace(/\r?\n+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (cleanText.length === 0) {
+        hideFloatingActions();
+        window.READIT_SYSTEM.pendingSelection = null;
+        if (!window.READIT_SYSTEM.activeCard) {
+            resetInspector();
+        }
+        return;
+    }
+
+    const validation = validateSelection(cleanText);
+    const words = cleanText.split(/\s+/).filter(Boolean);
+    const detectedCitations = detectCitations(cleanText);
+
+    const selectionData = {
+        text: cleanText,
+        rawText: rawText,
+        page: currentPageNum,
+        wordCount: words.length,
+        charCount: cleanText.length,
+        sentenceCount: validation.sentenceCount,
+        isValid: validation.isValid,
+        validationReason: validation.reason,
+        citations: detectedCitations,
+        hasCitations: detectedCitations.length > 0,
+        timestamp: Date.now()
+    };
+
+    window.READIT_SYSTEM.pendingSelection = selectionData;
+
+    if (validation.isValid) {
+        positionFloatingActions(selectionData.hasCitations);
+    } else {
+        hideFloatingActions();
+    }
+}
+
+function countSentences(text) {
+    if (!text || text.trim().length === 0) return 0;
+    
+    let protectedText = text;
+    const abbrevs = [
+        'Fig', 'Figs', 'Figure', 'Figures', 'Ref', 'Refs', 'Reference', 'References',
+        'Eq', 'Eqs', 'Equation', 'Equations', 'Sec', 'Secs', 'Section', 'Sections',
+        'al', 'e\\.g', 'i\\.e', 'vs', 'cf', 'vol', 'no', 'pp', 'Dr', 'Prof', 'MDPI',
+        'Inc', 'Ltd', 'Co', 'Univ', 'Dept', 'approx'
+    ];
+    abbrevs.forEach(abb => {
+        const regex = new RegExp(`\\b${abb}\\.`, 'gi');
+        protectedText = protectedText.replace(regex, match => match.slice(0, -1) + '§DOT§');
+    });
+    protectedText = protectedText.replace(/(\d+)\.(\d+)/g, '$1§DOT§$2');
+
+    const rawSplits = protectedText.split(/[.!?]+(?:\s+|$)(?=[A-Z0-9"'\(\]]|$)/);
+    const validSentences = rawSplits.map(s => s.replace(/§DOT§/g, '.').trim()).filter(s => s.length > 2);
+    return Math.max(1, validSentences.length);
+}
+
+function validateSelection(text) {
+    const trimmed = text.trim();
+    if (trimmed.length < 15) {
+        return {
+            isValid: false,
+            reason: 'Selection is too short. Please select at least one full sentence.',
+            sentenceCount: 1
+        };
+    }
+
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length < 4) {
+        return {
+            isValid: false,
+            reason: 'Selection is too short. Please select at least one full sentence.',
+            sentenceCount: 1
+        };
+    }
+
+    const sentenceCount = countSentences(trimmed);
+    if (sentenceCount > 4) {
+        return {
+            isValid: false,
+            reason: `Too much selected (${sentenceCount} sentences). Maximum allowed is 4 sentences.`,
+            sentenceCount
+        };
+    }
+
+    if (words.length > 160) {
+        return {
+            isValid: false,
+            reason: `Too much text selected (${words.length} words). Please select between 1 and 4 sentences.`,
+            sentenceCount
+        };
+    }
+
+    const sideTextRegex = /\b(citation:|academic editor:|received:|revised:|accepted:|published:|copyright:|licensee mdpi|https?:\/\/|doi\.org|\bmdpi\b|issn\b)/i;
+    if (sideTextRegex.test(trimmed)) {
+        return {
+            isValid: false,
+            reason: 'Accidentally selected sidebar / metadata text. Please select body sentences.',
+            sentenceCount
+        };
+    }
+
+    const letterChars = (trimmed.match(/[A-Za-z]/g) || []).length;
+    const letterRatio = letterChars / trimmed.length;
+    if (letterRatio < 0.55) {
+        return {
+            isValid: false,
+            reason: 'Selected text does not sound like natural body prose (too many symbols or fragmented layout).',
+            sentenceCount
+        };
+    }
+
+    return {
+        isValid: true,
+        reason: null,
+        sentenceCount
+    };
+}
+
+// =====================================================================
+// INSPECTOR UI UPDATE & CONDITIONAL TABS
+// =====================================================================
+function updateInspector(data) {
+    const emptyState = document.getElementById('inspector-empty-state');
+    const activeContent = document.getElementById('inspector-active-content');
+    const badge = document.getElementById('inspector-badge');
+    const statusDot = document.getElementById('inspector-status-dot');
+    const statusTag = document.getElementById('inspector-status-tag');
+    const citationPill = document.getElementById('inspector-citation-detected-pill');
+    const sentText = document.getElementById('inspector-sent-text');
+    const textWrapper = document.getElementById('inspector-text-wrapper');
+    const warningBox = document.getElementById('inspector-warning-box');
+    const warningText = document.getElementById('inspector-warning-text');
+    const sentencesEl = document.getElementById('inspector-sentences');
+    const wordsEl = document.getElementById('inspector-words');
+    const charsEl = document.getElementById('inspector-chars');
+    const tabCitation = document.getElementById('tab-btn-easy_citation');
+    const disabledHint = document.getElementById('translate-disabled-hint');
+
+    if (emptyState) emptyState.classList.add('hidden');
+    if (activeContent) activeContent.classList.remove('hidden');
+
+    if (sentText) sentText.textContent = data.text;
+    if (sentencesEl) sentencesEl.textContent = `${data.sentenceCount} sentence${data.sentenceCount !== 1 ? 's' : ''}`;
+    if (wordsEl) wordsEl.textContent = `${data.wordCount} words`;
+    if (charsEl) charsEl.textContent = `${data.charCount} chars`;
+
+    // STRICT CONDITIONAL: Easy Citation tab only visible when citation is included
+    const hasCitations = data.citations && data.citations.length > 0;
+    if (hasCitations) {
+        if (tabCitation) {
+            tabCitation.classList.remove('hidden');
+            tabCitation.classList.add('flex');
+        }
+        if (citationPill) {
+            citationPill.textContent = `Citation: ${data.citations.join(', ')}`;
+            citationPill.classList.remove('hidden');
+        }
+    } else {
+        if (tabCitation) {
+            tabCitation.classList.add('hidden');
+            tabCitation.classList.remove('flex');
+        }
+        if (citationPill) citationPill.classList.add('hidden');
+        
+        if (window.READIT_SYSTEM.activeFeature === 'easy_citation') {
+            window.READIT_SYSTEM.activeFeature = 'translating_idea';
+        }
+    }
+
+    if (data.isValid) {
+        if (badge) {
+            badge.textContent = `Valid Selection (${data.sentenceCount} sent)`;
+            badge.className = 'text-xs font-semibold uppercase tracking-wider text-readitGreen';
+        }
+        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-readitGreen animate-pulse';
+        if (statusTag) {
+            statusTag.textContent = `Page ${data.page}`;
+            statusTag.className = 'text-xs font-monoFeature px-2.5 py-1 rounded-md bg-white/[0.08] text-white/80 border border-white/10';
+        }
+        if (warningBox) warningBox.classList.add('hidden');
+        if (textWrapper) textWrapper.className = 'p-3.5 rounded-xl bg-hubCard border border-white/10 shadow-inner max-h-[160px] overflow-y-auto transition-colors';
+
+        document.querySelectorAll('#btn-trigger-idea, #btn-trigger-quickref, #btn-trigger-citation').forEach(b => b.disabled = false);
+        if (disabledHint) disabledHint.classList.add('hidden');
+    } else {
+        if (badge) {
+            badge.textContent = 'Invalid Selection';
+            badge.className = 'text-xs font-semibold uppercase tracking-wider text-amber-400';
+        }
+        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        if (statusTag) {
+            statusTag.textContent = 'Rule Violation';
+            statusTag.className = 'text-xs font-monoFeature px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30';
+        }
+        if (warningBox) {
+            warningBox.classList.remove('hidden');
+            if (warningText) warningText.textContent = data.validationReason || 'Selection does not meet required rules.';
+        }
+        if (textWrapper) textWrapper.className = 'p-3.5 rounded-xl bg-hubCard border border-amber-500/30 shadow-inner max-h-[160px] overflow-y-auto transition-colors';
+
+        document.querySelectorAll('#btn-trigger-idea, #btn-trigger-quickref, #btn-trigger-citation').forEach(b => b.disabled = true);
+        if (disabledHint) {
+            disabledHint.classList.remove('hidden');
+            disabledHint.textContent = data.validationReason || 'Please select 1 to 4 body sentences.';
+        }
+    }
+}
+
+function resetInspector() {
+    window.READIT_SYSTEM.activeCard = false;
+    window.READIT_SYSTEM.activeCardData = null;
+    window.READIT_SYSTEM.pendingSelection = null;
+    window.READIT_SYSTEM.selectedText = '';
+    window.READIT_SYSTEM.featureCache = {};
+    window.READIT_SYSTEM.copyPayloads = {};
+
+    const emptyState = document.getElementById('inspector-empty-state');
+    const activeContent = document.getElementById('inspector-active-content');
+    const badge = document.getElementById('inspector-badge');
+    const statusDot = document.getElementById('inspector-status-dot');
+    const warningBox = document.getElementById('inspector-warning-box');
+
+    if (emptyState) emptyState.classList.remove('hidden');
+    if (activeContent) activeContent.classList.add('hidden');
+    if (warningBox) warningBox.classList.add('hidden');
+
+    document.getElementById('idea-explanation-container')?.classList.add('hidden');
+    document.getElementById('quickref-container')?.classList.add('hidden');
+    document.getElementById('citation-container')?.classList.add('hidden');
+
+    if (badge) {
+        badge.textContent = 'Interactive Lens Companion';
+        badge.className = 'text-xs font-semibold uppercase tracking-wider text-white/50';
+    }
+    if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-white/30';
+}
+
+function copyCurrentSelection() {
+    const text = window.READIT_SYSTEM.selectedText;
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        const copyText = document.getElementById('copy-text');
+        if (copyText) {
+            const original = copyText.textContent;
+            copyText.textContent = 'Copied!';
+            setTimeout(() => { copyText.textContent = original; }, 1500);
+        }
+    });
+}
+
+// =====================================================================
+// NATURAL LANGUAGE SWITCHER (Simple EN | Bahasa ID)
+// =====================================================================
+function setReaderLang(lang) {
+    if (!['en', 'id'].includes(lang)) return;
+    currentReaderLang = lang;
+    window.READIT_SYSTEM.currentLang = lang;
+
+    const floatEn = document.getElementById('floating-lang-en');
+    const floatId = document.getElementById('floating-lang-id');
+    const langBadge = document.getElementById('inspector-lang-badge');
+    const ideaLangTag = document.getElementById('idea-lang-tag');
+
+    if (lang === 'en') {
+        if (floatEn) floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
+        if (floatId) floatId.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation";
+        if (langBadge) {
+            langBadge.textContent = 'EN';
+            langBadge.className = 'font-monoFeature text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-readitGreen border border-white/10';
+        }
+        if (ideaLangTag) ideaLangTag.textContent = 'EN';
+
+        document.getElementById('label-core-action')?.replaceChildren(document.createTextNode('Core Action (Actor → Action → Outcome)'));
+        document.getElementById('label-plain-meaning')?.replaceChildren(document.createTextNode('Plain Language (0 Dropped Constraints)'));
+        document.getElementById('label-why-matters')?.replaceChildren(document.createTextNode('Why It Matters'));
+        document.getElementById('label-real-subject')?.replaceChildren(document.createTextNode('Who Actually Did This? (Real Subject)'));
+        document.getElementById('label-active-rewrite')?.replaceChildren(document.createTextNode('Direct Active Voice Rewrite'));
+        document.getElementById('label-ref-title')?.replaceChildren(document.createTextNode('Cited Work / Foundation'));
+        document.getElementById('label-supporting-claim')?.replaceChildren(document.createTextNode('Supporting Claim Grounded on Citation'));
+        document.getElementById('label-why-cited')?.replaceChildren(document.createTextNode('Why the Authors Cited This'));
+    } else {
+        if (floatEn) floatEn.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full text-white/70 hover:text-white active:scale-95 transition-all text-xs font-semibold tracking-wide focus:outline-none touch-manipulation";
+        if (floatId) floatId.className = "flex items-center gap-1.5 px-4 sm:px-5 py-2.5 min-h-[44px] min-w-[96px] justify-center rounded-full bg-readitGreen text-black font-semibold text-xs tracking-wide transition-all shadow-md active:scale-95 focus:outline-none touch-manipulation";
+        if (langBadge) {
+            langBadge.textContent = 'ID';
+            langBadge.className = 'font-monoFeature text-[10px] px-2 py-0.5 rounded bg-readitGreen/15 text-readitGreen border border-readitGreen/30';
+        }
+        if (ideaLangTag) ideaLangTag.textContent = 'ID';
+
+        document.getElementById('label-core-action')?.replaceChildren(document.createTextNode('Tindakan Inti (Aktor → Aksi → Hasil)'));
+        document.getElementById('label-plain-meaning')?.replaceChildren(document.createTextNode('Bahasa Sederhana (Tanpa Pangkas Batasan)'));
+        document.getElementById('label-why-matters')?.replaceChildren(document.createTextNode('Mengapa Ini Penting?'));
+        document.getElementById('label-real-subject')?.replaceChildren(document.createTextNode('Siapa Pelaku Sebenarnya? (Subjek Nyata)'));
+        document.getElementById('label-active-rewrite')?.replaceChildren(document.createTextNode('Tulis Ulang Kalimat Aktif Langsung'));
+        document.getElementById('label-ref-title')?.replaceChildren(document.createTextNode('Karya Ilmiah yang Dikutip'));
+        document.getElementById('label-supporting-claim')?.replaceChildren(document.createTextNode('Klaim Makalah yang Didukung Sitasi'));
+        document.getElementById('label-why-cited')?.replaceChildren(document.createTextNode('Alasan Penulis Mengutip Rujukan Ini'));
+    }
+
+    const data = window.READIT_SYSTEM.activeCardData || window.READIT_SYSTEM.pendingSelection;
+    if (window.READIT_SYSTEM.activeCard && data && data.text) {
+        const feature = window.READIT_SYSTEM.activeFeature;
+        const cacheKey = `${feature}_${lang}`;
+        if (window.READIT_SYSTEM.featureCache[cacheKey]) {
+            renderFeatureOutput(feature, window.READIT_SYSTEM.featureCache[cacheKey]);
+        } else {
+            executeFeatureLens(feature, data);
+        }
+    }
+}
+
+// =====================================================================
+// FOCUSED FEATURE DRAWER SWITCHER
+// =====================================================================
+function switchFeatureDrawer(feature) {
+    if (!['translating_idea', 'quick_reference', 'easy_citation'].includes(feature)) {
+        feature = 'translating_idea';
+    }
+
+    window.READIT_SYSTEM.activeFeature = feature;
+
+    const tabs = ['translating_idea', 'quick_reference', 'easy_citation'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const drawer = document.getElementById(`drawer-${t}`);
+
+        if (t === feature) {
+            if (btn) {
+                btn.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-readitGreen text-black shadow-sm';
+            }
+            if (drawer) drawer.classList.remove('hidden');
+        } else {
+            if (btn) {
+                btn.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-white/70 hover:text-white bg-transparent';
+            }
+            if (drawer) drawer.classList.add('hidden');
+        }
+    });
+
+    const data = window.READIT_SYSTEM.activeCardData || window.READIT_SYSTEM.pendingSelection;
+    if (data && data.text) {
+        const lang = window.READIT_SYSTEM.currentLang || 'en';
+        const cacheKey = `${feature}_${lang}`;
+        if (window.READIT_SYSTEM.featureCache[cacheKey]) {
+            renderFeatureOutput(feature, window.READIT_SYSTEM.featureCache[cacheKey]);
+        } else {
+            executeFeatureLens(feature, data);
+        }
+    }
+}
+
+async function triggerCurrentFeatureAction() {
+    const data = window.READIT_SYSTEM.activeCardData || window.READIT_SYSTEM.pendingSelection;
+    if (!data || !data.text) return;
+    await executeFeatureLens(window.READIT_SYSTEM.activeFeature, data);
+}
+
+// =====================================================================
+// CALL BACKEND LENS API WITH CONTEXT & CONSTRAINTS
+// =====================================================================
+async function executeFeatureLens(feature, data) {
+    if (!data || !data.text) return;
+
+    const lang = window.READIT_SYSTEM.currentLang || 'en';
+    const cacheKey = `${feature}_${lang}`;
+
+    let apiLensType = feature;
+    if (feature === 'translating_idea') apiLensType = 'intuition';
+
+    setDrawerLoading(feature, true);
+
+    try {
+        const response = await fetch('/api/lens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: data.text,
+                lens_type: apiLensType,
+                language: lang,
+                paper_context: window.READIT_SYSTEM.paperContext || null
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server returned HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        window.READIT_SYSTEM.featureCache[cacheKey] = result;
+        renderFeatureOutput(feature, result);
+    } catch (err) {
+        console.error(`Failed to execute lens [${feature}]:`, err);
+        renderFeatureError(feature, err.message);
+    } finally {
+        setDrawerLoading(feature, false);
+    }
+}
+
+function setDrawerLoading(feature, isLoading) {
+    if (feature === 'translating_idea') {
+        const btn = document.getElementById('btn-trigger-idea');
+        const label = document.getElementById('btn-idea-label');
+        const container = document.getElementById('idea-explanation-container');
+        const actionEl = document.getElementById('idea-core-action');
+        const plainEl = document.getElementById('idea-plain-meaning');
+        const takeawayEl = document.getElementById('idea-takeaway');
+        const anchorEl = document.getElementById('idea-context-anchor');
+        const errorEl = document.getElementById('idea-explanation-error');
+
+        if (btn) btn.disabled = isLoading;
+        if (label) label.textContent = isLoading ? 'Simplifying (Preserving Constraints)...' : 'Deconstruct Idea (3s Scan)';
+        if (isLoading) {
+            if (container) container.classList.remove('hidden');
+            if (errorEl) errorEl.classList.add('hidden');
+            if (actionEl) actionEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Extracting Actor → Action → Outcome...</span>';
+            if (plainEl) plainEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Simplifying lexical complexity...</span>';
+            if (takeawayEl) takeawayEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Evaluating paper impact...</span>';
+            if (anchorEl) anchorEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Grounding in paper context...</span>';
+        }
+    } else if (feature === 'quick_reference') {
+        const btn = document.getElementById('btn-trigger-quickref');
+        const label = document.getElementById('btn-quickref-label');
+        const container = document.getElementById('quickref-container');
+        const realSubjectEl = document.getElementById('quickref-real-subject');
+        const activeRewriteEl = document.getElementById('quickref-active-rewrite');
+        const passivesContainer = document.getElementById('quickref-passive-container');
+        const antecedentsContainer = document.getElementById('quickref-antecedents-container');
+        const errorEl = document.getElementById('quickref-error');
+
+        if (btn) btn.disabled = isLoading;
+        if (label) label.textContent = isLoading ? 'Decoding Actor & Referents...' : 'Decode Passive & Antecedents';
+        if (isLoading) {
+            if (container) container.classList.remove('hidden');
+            if (errorEl) errorEl.classList.add('hidden');
+            if (realSubjectEl) realSubjectEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Resolving real actor / who acted...</span>';
+            if (activeRewriteEl) activeRewriteEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Rewriting in direct active voice...</span>';
+            if (passivesContainer) passivesContainer.innerHTML = '<span class="text-white/40 italic animate-pulse text-[11px]">Detecting passive verbs...</span>';
+            if (antecedentsContainer) antecedentsContainer.innerHTML = '<span class="text-white/40 italic animate-pulse text-[11px]">Mapping ambiguous pronouns and nouns...</span>';
+        }
+    } else if (feature === 'easy_citation') {
+        const btn = document.getElementById('btn-trigger-citation');
+        const label = document.getElementById('btn-citation-label');
+        const container = document.getElementById('citation-container');
+        const titleEl = document.getElementById('citation-ref-title');
+        const claimEl = document.getElementById('citation-supporting-claim');
+        const whyEl = document.getElementById('citation-why-cited');
+        const errorEl = document.getElementById('citation-error');
+
+        if (btn) btn.disabled = isLoading;
+        if (label) label.textContent = isLoading ? 'Unpacking Citation Context...' : 'Unpack Citation Context';
+        if (isLoading) {
+            if (container) container.classList.remove('hidden');
+            if (errorEl) errorEl.classList.add('hidden');
+            if (titleEl) titleEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Locating cited publication...</span>';
+            if (claimEl) claimEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Extracting sentence claim relying on this reference...</span>';
+            if (whyEl) whyEl.innerHTML = '<span class="text-white/40 italic animate-pulse">Analyzing author rationale for citation...</span>';
+        }
+    }
+}
+
+function renderFeatureOutput(feature, result) {
+    const isID = window.READIT_SYSTEM.currentLang === 'id';
+
+    if (feature === 'translating_idea') {
+        const container = document.getElementById('idea-explanation-container');
+        const actionEl = document.getElementById('idea-core-action');
+        const plainEl = document.getElementById('idea-plain-meaning');
+        const takeawayEl = document.getElementById('idea-takeaway');
+        const anchorEl = document.getElementById('idea-context-anchor');
+        const errorEl = document.getElementById('idea-explanation-error');
+
+        let coreAction = (result.core_action || '').trim();
+        let plainMeaning = (result.plain_meaning || '').trim();
+        let takeaway = (result.takeaway || '').trim();
+        let contextLink = (result.context_link || '').trim();
+
+        if (!coreAction && result.explanation) {
+            const raw = result.explanation;
+            const actionMatch = raw.match(/\*\*⚡?\s*(?:CORE ACTION|TINDAKAN INTI)\*\*\s*([\s\S]*?)(?=\*\*📖|\*\*PLAIN|\*\*BAHASA|$)/i);
+            const plainMatch = raw.match(/\*\*📖?\s*(?:PLAIN ENGLISH|PLAIN LANGUAGE|BAHASA SEDERHANA)\*\*\s*([\s\S]*?)(?=\*\*🎯|\*\*WHY|\*\*MENGAPA|$)/i);
+            const takeMatch = raw.match(/\*\*🎯?\s*(?:WHY IT MATTERS|MENGAPA INI PENTING)\*\*\s*([\s\S]*?)(?=\*\*🔒|\*\*CONTEXT|\*\*KONTEKS|$)/i);
+            const anchorMatch = raw.match(/\*\*🔒?\s*(?:CONTEXT ANCHOR|JANGKAR KONTEKS)\*\*\s*([\s\S]*?)$/i);
+
+            if (actionMatch) coreAction = actionMatch[1].trim();
+            if (plainMatch) plainMeaning = plainMatch[1].trim();
+            if (takeMatch) takeaway = takeMatch[1].replace(/^[•\-\*]\s*/, '').trim();
+            if (anchorMatch) contextLink = anchorMatch[1].trim();
+            if (!plainMeaning) plainMeaning = raw;
+        }
+
+        if (!coreAction) {
+            coreAction = isID ? 'Mekanisme utama yang dijelaskan pada teks terpilih.' : 'Key mechanism outlined in selected text.';
+        }
+        if (!takeaway) {
+            takeaway = isID ? 'Secara langsung memengaruhi metodologi dan hasil riset.' : 'Directly impacts the core thesis and methodology.';
+        }
+        if (!contextLink) {
+            contextLink = window.READIT_SYSTEM.paperContext?.domain 
+                ? (isID ? `Bidang: ${window.READIT_SYSTEM.paperContext.domain}` : `Domain: ${window.READIT_SYSTEM.paperContext.domain}`)
+                : (isID ? 'Terkait erat dengan konteks keseluruhan makalah.' : 'Grounded in global paper context.');
+        }
+
+        if (actionEl) actionEl.textContent = coreAction;
+        if (plainEl) plainEl.textContent = plainMeaning;
+        if (takeawayEl) takeawayEl.textContent = takeaway;
+        if (anchorEl) anchorEl.textContent = contextLink;
+
+        window.READIT_SYSTEM.copyPayloads['translating_idea'] = 
+            `⚡ ${isID ? 'TINDAKAN INTI' : 'CORE ACTION'}:\n${coreAction}\n\n` +
+            `📖 ${isID ? 'BAHASA SEDERHANA' : 'PLAIN MEANING'}:\n${plainMeaning}\n\n` +
+            `🎯 ${isID ? 'MENGAPA PENTING' : 'WHY IT MATTERS'}:\n• ${takeaway}\n\n` +
+            `🔒 ${isID ? 'JANGKAR KONTEKS' : 'CONTEXT ANCHOR'}:\n${contextLink}`;
+
+        if (container) container.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+
+    } else if (feature === 'quick_reference') {
+        const container = document.getElementById('quickref-container');
+        const realSubjectEl = document.getElementById('quickref-real-subject');
+        const activeRewriteEl = document.getElementById('quickref-active-rewrite');
+        const passivesContainer = document.getElementById('quickref-passive-container');
+        const antecedentsContainer = document.getElementById('quickref-antecedents-container');
+        const errorEl = document.getElementById('quickref-error');
+
+        let realSubject = typeof result.real_subject === 'string' ? result.real_subject : JSON.stringify(result.real_subject || '');
+        let activeRewrite = typeof result.active_rewrite === 'string' ? result.active_rewrite : JSON.stringify(result.active_rewrite || '');
+        let passiveList = Array.isArray(result.passive_phrases) ? result.passive_phrases : [];
+        let antecedents = Array.isArray(result.antecedents) ? result.antecedents : [];
+
+        if (realSubjectEl) realSubjectEl.textContent = realSubject || (isID ? 'Penulis / Peneliti studi ini' : 'The study authors / researchers');
+        if (activeRewriteEl) activeRewriteEl.textContent = activeRewrite || (isID ? 'Penulis melakukan aksi secara langsung.' : 'The authors performed the action directly.');
+
+        if (passivesContainer) {
+            if (passiveList.length > 0) {
+                passivesContainer.innerHTML = passiveList.map(phrase => 
+                    `<span class="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/25 text-[11px] font-monoFeature">"${escapeHtml(String(phrase))}"</span>`
+                ).join('');
+            } else {
+                passivesContainer.innerHTML = `<span class="text-white/50 text-[11px] italic">${isID ? 'Tidak ada frasa pasif yang kabur' : 'No ambiguous passive phrases detected'}</span>`;
+            }
+        }
+
+        if (antecedentsContainer) {
+            if (antecedents.length > 0) {
+                antecedentsContainer.innerHTML = antecedents.map(item => {
+                    const term = typeof item === 'object' ? (item.term || item.referent || Object.keys(item)[0]) : String(item);
+                    const meaning = typeof item === 'object' ? (item.refers_to || item.meaning || item.antecedent || Object.values(item)[0]) : '';
+                    return `<div class="p-2 rounded-lg bg-white/[0.03] border border-white/08 flex items-start gap-2">
+                        <span class="font-monoFeature font-semibold text-readitGreen shrink-0">${escapeHtml(term)}</span>
+                        <span class="text-white/40">→</span>
+                        <span class="text-white/90 leading-snug">${escapeHtml(meaning)}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                antecedentsContainer.innerHTML = `<span class="text-white/50 text-[11px] italic">${isID ? 'Semua rujukan kata ganti jelas' : 'All referents and pronouns are clear'}</span>`;
+            }
+        }
+
+        window.READIT_SYSTEM.copyPayloads['quick_reference'] = 
+            `🔍 ${isID ? 'RUJUKAN CEPAT (DEKODER SUBJEK & RUJUKAN)' : 'QUICK REFERENCE (SUBJECT & REFERENT DECODER)'}:\n` +
+            `• ${isID ? 'Subjek Nyata' : 'Real Subject'}: ${realSubject}\n` +
+            `• ${isID ? 'Kalimat Aktif' : 'Active Voice'}: ${activeRewrite}\n` +
+            `• ${isID ? 'Frasa Pasif' : 'Passive Phrases'}: ${passiveList.join(', ')}`;
+
+        if (container) container.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+
+    } else if (feature === 'easy_citation') {
+        const container = document.getElementById('citation-container');
+        const labelBadge = document.getElementById('citation-label-badge');
+        const titleEl = document.getElementById('citation-ref-title');
+        const claimEl = document.getElementById('citation-supporting-claim');
+        const whyEl = document.getElementById('citation-why-cited');
+        const errorEl = document.getElementById('citation-error');
+
+        const citLabel = result.citation_label || (window.READIT_SYSTEM.activeCardData?.citations?.[0] || '[1]');
+        const refTitle = result.reference_title || (isID ? 'Daftar Pustaka Makalah (Rujukan Terindeks)' : 'Paper Reference Bibliography');
+        const supportingClaim = result.supporting_claim || (isID ? 'Klaim utama kalimat ini didasarkan pada rujukan tersebut.' : 'Sentence claim is substantiated by this literature.');
+        const whyCited = result.why_cited || (isID ? 'Dikutip untuk memperkuat bukti empiris dari premis penelitian.' : 'Cited to substantiate the empirical claim in this study.');
+
+        if (labelBadge) labelBadge.textContent = citLabel;
+        if (titleEl) titleEl.textContent = refTitle;
+        if (claimEl) claimEl.textContent = supportingClaim;
+        if (whyEl) whyEl.textContent = whyCited;
+
+        window.READIT_SYSTEM.copyPayloads['easy_citation'] = 
+            `📚 ${isID ? 'SITASI MUDAH' : 'EASY CITATION'} (${citLabel}):\n` +
+            `• ${isID ? 'Karya Ilmiah' : 'Reference'}: ${refTitle}\n` +
+            `• ${isID ? 'Klaim yang Didukung' : 'Supporting Claim'}: ${supportingClaim}\n` +
+            `• ${isID ? 'Alasan Dikutip' : 'Why Cited'}: ${whyCited}`;
+
+        if (container) container.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+    }
+}
+
+function renderFeatureError(feature, errorMsg) {
+    let errorContainerId = 'idea-explanation-error';
+    if (feature === 'quick_reference') errorContainerId = 'quickref-error';
+    if (feature === 'easy_citation') errorContainerId = 'citation-error';
+
+    const errEl = document.getElementById(errorContainerId);
+    if (errEl) {
+        errEl.classList.remove('hidden');
+        errEl.innerHTML = `<div class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">Error resolving ${feature}: ${escapeHtml(errorMsg)}</div>`;
+    }
+}
+
+function copyDrawerContent(feature) {
+    const text = window.READIT_SYSTEM.copyPayloads[feature];
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        let labelId = 'copy-idea-label';
+        if (feature === 'quick_reference') labelId = 'copy-quickref-label';
+        if (feature === 'easy_citation') labelId = 'copy-citation-label';
+
+        const label = document.getElementById(labelId);
+        if (label) {
+            const original = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(() => { label.textContent = original; }, 1500);
+        }
+    });
+}
+
+function escapeHtml(str) {
+    if (typeof str !== 'string') return String(str || '');
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 // Left Sidebar Tab Switcher
@@ -1848,9 +2219,9 @@ function switchHubTab(tab) {
         const btn = document.getElementById(`hub-nav-${t}`);
         if (!btn) return;
         if (t === tab) {
-            btn.className = "sidebar-nav-btn w-full py-2 px-3.5 rounded-full text-[13px] font-normal border border-white/70 text-white bg-white/[0.03] transition flex items-center gap-3 focus:outline-none";
+            btn.className = "sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-medium border border-white/70 text-white bg-white/[0.05] transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation";
         } else {
-            btn.className = "sidebar-nav-btn w-full py-2 px-3.5 rounded-full text-[13px] font-normal border border-white/[0.12] text-white/40 hover:text-white/80 hover:border-white/30 transition flex items-center gap-3 focus:outline-none";
+            btn.className = "sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-normal border border-white/[0.12] text-white/40 hover:text-white/80 hover:border-white/30 transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation";
         }
     });
 
@@ -1887,19 +2258,19 @@ function toggleRecentDocumentsGrid() {
 const guideModalItems = [
     {
         title: "01 · Hover & Click Sentence",
-        desc: "Hover over any sentence in your PDF to highlight the full sentence automatically. Click once to open the inline breakdown accordion right below the paragraph."
+        desc: "Hover over any sentence in your PDF to highlight the full sentence automatically. Click once to open the companion inspector beside the paper without losing your reading spot."
     },
     {
         title: "02 · Translating Idea",
-        desc: "Converts dense C1/C2 academic phrasing into plain, clear language in Simple English or Bahasa Indonesia while keeping technical accuracy intact."
+        desc: "Converts dense C1/C2 academic phrasing into plain, clear language in Simple English or Bahasa Indonesia while keeping technical accuracy and constraints intact."
     },
     {
         title: "03 · Quick Reference (Passive Voice)",
-        desc: "Automatically links ambiguous passive phrases ('were identified', 'this challenge') back to the exact actor or subject in preceding sentences."
+        desc: "Automatically links ambiguous passive phrases and pronouns back to the exact actor or subject in preceding sentences."
     },
     {
         title: "04 · Easy Citation",
-        desc: "Brings bibliography references like [1] directly into your inline reading accordion so you never lose your scroll position."
+        desc: "Brings bibliography references like [1] directly into your reading inspector so you never lose your scroll position."
     }
 ];
 
@@ -1954,17 +2325,13 @@ function openAccountModal(type) {
                         <option value="id" ${currentReaderLang === 'id' ? 'selected' : ''}>Bahasa Indonesia (ID)</option>
                     </select>
                 </div>
-                <label class="flex items-center justify-between p-3 rounded-lg bg-[#1A1A1A] border border-white/10 cursor-pointer">
-                    <span>Auto-highlight whole sentence on hover</span>
-                    <input type="checkbox" checked class="accent-[#76B843]" />
-                </label>
             </div>
         `;
     } else {
         title.textContent = 'Privacy and Policy';
         body.innerHTML = `
             <p class="leading-relaxed text-white/70">
-                READit processes uploaded academic PDFs locally in your browser session and only sends individual clicked sentences (plus adjacent sentence context) to generate plain-language breakdowns. Your manuscripts are never used to train external models.
+                READit processes uploaded academic PDFs locally in your browser session and only sends individual inspected sentences (plus background context anchors) to generate plain-language breakdowns. Your manuscripts are never used to train external models.
             </p>
         `;
     }
@@ -2002,15 +2369,41 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalDragAndDrop();
     renderHubDocuments();
     setTimeout(initGoogleIdentity, 600);
+
+    // Register selection change listeners for floating actions bar on PDF TextLayer
+    document.addEventListener('selectionchange', handleSelectionChange);
+    window.addEventListener('mouseup', handleSelectionChange);
 });
 
+// Debounced window resize handler for PDF Canvas
+window.addEventListener('resize', () => {
+    if (!currentPdf) return;
+    clearTimeout(resizeDebounceTimer);
+    resizeDebounceTimer = setTimeout(() => {
+        renderPage(currentPageNum);
+    }, 150);
+});
 
-// Shortcuts: Escape closes modals, Ctrl+B / Cmd+B toggles sidebar, Ctrl+Q cycles tabs
+// Hide floating actions on viewport scroll
+const readerViewport = document.getElementById('reader-viewport');
+if (readerViewport) {
+    readerViewport.addEventListener('scroll', () => {
+        hideFloatingActions();
+    }, { passive: true });
+}
+window.addEventListener('scroll', () => {
+    hideFloatingActions();
+}, { passive: true });
+
+// Keyboard shortcuts: Escape closes modals, Ctrl+B toggles sidebar, Ctrl+Q cycles tabs, Arrow keys flip pages
 window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
     if (e.key === 'Escape') {
         closeAuthModal();
         closeGuideVideoModal();
         closeAccountModal();
+        hideFloatingActions();
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
@@ -2020,6 +2413,11 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         navigateNextTab(e.shiftKey);
     }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        changePage(-1);
+    } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        changePage(1);
+    }
 });
 
 // Expose functions globally for HTML event handlers
@@ -2028,6 +2426,7 @@ window.switchHubTab = switchHubTab;
 window.handleAccountTriggerClick = handleAccountTriggerClick;
 window.toggleAccountMenu = toggleAccountMenu;
 window.toggleSidebarMinimize = toggleSidebarMinimize;
+window.toggleMobileSidebar = toggleMobileSidebar;
 window.openAuthModal = openAuthModal;
 window.closeAuthModal = closeAuthModal;
 window.switchToSignUp = switchToSignUp;
@@ -2041,11 +2440,13 @@ window.handleDragOver = handleDragOver;
 window.handleDragLeave = handleDragLeave;
 window.handleFileDrop = handleFileDrop;
 window.handlePdfFiles = handlePdfFiles;
+window.processAndOpenPdf = processAndOpenPdf;
 window.toggleRecentDocumentsGrid = toggleRecentDocumentsGrid;
 window.openSmartReader = openSmartReader;
 window.closeSmartReader = closeSmartReader;
 window.switchReaderTab = switchReaderTab;
 window.closeReaderTab = closeReaderTab;
+window.togglePaperSwitcherDrawer = togglePaperSwitcherDrawer;
 window.handleTabDragStart = handleTabDragStart;
 window.handleTabDragOver = handleTabDragOver;
 window.handleTabDragEnter = handleTabDragEnter;
@@ -2053,9 +2454,19 @@ window.handleTabDragLeave = handleTabDragLeave;
 window.handleTabDrop = handleTabDrop;
 window.handleTabDragEnd = handleTabDragEnd;
 window.navigateNextTab = navigateNextTab;
-window.selectReaderSentence = selectReaderSentence;
+window.changePage = changePage;
+window.renderPage = renderPage;
+window.loadPdfDocument = loadPdfDocument;
+window.prebakePaperContext = prebakePaperContext;
+window.handleFloatingFeatureClick = handleFloatingFeatureClick;
+window.switchFeatureDrawer = switchFeatureDrawer;
+window.triggerCurrentFeatureAction = triggerCurrentFeatureAction;
+window.executeFeatureLens = executeFeatureLens;
+window.copyDrawerContent = copyDrawerContent;
+window.copyCurrentSelection = copyCurrentSelection;
 window.setReaderLang = setReaderLang;
-window.requestGeminiLensForSentence = requestGeminiLensForSentence;
+window.detectCitations = detectCitations;
+window.detectCitationsInText = detectCitationsInText;
 window.openGuideVideoModal = openGuideVideoModal;
 window.closeGuideVideoModal = closeGuideVideoModal;
 window.openAccountModal = openAccountModal;

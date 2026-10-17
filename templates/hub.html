@@ -19,7 +19,8 @@
     <!-- Separated Custom Document Hub Stylesheet -->
     <link rel="stylesheet" href="/static/css/hub.css">
 
-    <!-- PDF.js CDN for Client-Side PDF Parsing & Multi-Doc Support -->
+    <!-- PDF.js CDN to Render the Real Paper + Official TextLayer Stylesheet -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         if (window.pdfjsLib) {
@@ -257,7 +258,7 @@
 
             <!-- SECTION 2: Recent Document ▼ -->
             <section class="mt-8 sm:mt-12">
-                <div class="flex items-center gap-2 mb-4 sm:mb-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-5">
                     <button onclick="toggleRecentDocumentsGrid()" class="inline-flex items-center gap-2.5 text-sm sm:text-[15px] font-semibold text-white hover:text-white/85 focus:outline-none min-h-[44px] touch-manipulation">
                         <span id="hub-section-heading">Recent Document</span>
                         <span id="recent-dropdown-triangle" class="text-[11px] text-white transition-transform duration-200">▼</span>
@@ -350,11 +351,20 @@
                     </div>
                 </div>
 
-                <!-- Desktop Helper Text (Translation toggle removed as requested, keeping hovering one) -->
-                <div class="hidden lg:flex items-center gap-3 shrink-0">
-                    <span class="text-[11px] text-white/45">
-                        Hover sentence to highlight • Click for inline guide
-                    </span>
+                <!-- Right Controls: Paper Context Pill & Page Navigation -->
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <!-- Paper Context Status Pill (Anti-Hallucination Engine) -->
+                    <div id="paper-context-pill" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/10 text-xs text-white/70 max-w-[220px] truncate" title="Global Paper Context">
+                        <span id="context-status-dot" class="w-2 h-2 rounded-full bg-white/30 shrink-0"></span>
+                        <span id="context-status-label" class="truncate text-[11px] font-monoFeature">Context: Idle</span>
+                    </div>
+
+                    <!-- Page Pagination (< 1 / N >) -->
+                    <div id="page-nav" class="hidden items-center gap-1 bg-black/40 border border-white/10 rounded-full px-1 py-0.5 text-xs">
+                        <button onclick="changePage(-1)" id="btn-prev" class="w-6 h-6 rounded-full flex items-center justify-center text-white/60 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition">‹</button>
+                        <span id="page-label" class="px-2 font-monoFeature text-[11px] text-white/90">1 / 1</span>
+                        <button onclick="changePage(1)" id="btn-next" class="w-6 h-6 rounded-full flex items-center justify-center text-white/60 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition">›</button>
+                    </div>
                 </div>
             </div>
 
@@ -391,133 +401,380 @@
                 </div>
             </div>
 
-            <!-- Scrollable Paper Canvas with Whole-Sentence Hover & Click Guide -->
-            <!-- pb-36 sm:pb-44 ensures floating bottom action bar NEVER blocks paper content! -->
-            <div class="flex-1 overflow-y-auto p-4 sm:p-8 md:p-10 pb-36 sm:pb-44 flex justify-center bg-hubCanvas">
-                <div id="reader-paper-sheet" class="academic-paper-sheet w-full max-w-[820px] rounded-xl p-5 sm:p-8 md:p-12 font-serifPaper text-[#111827] leading-[1.78] h-fit select-text">
+            <!-- Main Workspace: Real PDF Paper Sheet + Live Sentence Inspector Beside It -->
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-36 sm:pb-44 flex justify-center bg-hubCanvas relative" id="reader-viewport">
+                <div class="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 w-full max-w-[1260px] transition-all">
                     
-                    <!-- Journal Top Header -->
-                    <div class="flex flex-col sm:flex-row sm:items-start justify-between pb-4 mb-5 border-b-2 border-neutral-800 gap-4">
-                        <div class="space-y-1.5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-11 h-11 rounded-full border border-[#0284C7] flex items-center justify-center relative overflow-hidden shrink-0 text-[#0284C7]">
-                                    <svg class="w-10 h-10 opacity-85" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.1">
-                                        <circle cx="20" cy="20" r="16"/>
-                                        <ellipse cx="20" cy="20" rx="8" ry="16"/>
-                                        <line x1="4" y1="14" x2="36" y2="14"/>
-                                        <line x1="4" y1="20" x2="36" y2="20"/>
-                                        <line x1="4" y1="26" x2="36" y2="26"/>
-                                    </svg>
-                                    <span class="absolute bg-white px-1 font-sans font-black text-[9px] tracking-tighter text-[#0369A1]">AIMS</span>
+                    <!-- 1. The Paper Sheet Container -->
+                    <div id="paper-card" class="academic-paper-sheet w-full max-w-[820px] rounded-xl overflow-hidden h-fit transition-all flex flex-col items-center justify-center min-h-[500px] shrink-0">
+                        
+                        <!-- Empty State (Shown before importing a paper) -->
+                        <div id="empty-state" class="p-12 text-center flex flex-col items-center justify-center space-y-4 text-neutral-600 select-none">
+                            <div class="w-16 h-16 rounded-2xl bg-neutral-100 flex items-center justify-center text-neutral-400">
+                                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-neutral-800">No Paper Loaded</h3>
+                                <p class="text-xs text-neutral-500 mt-1 max-w-sm">
+                                    Import an academic PDF to begin reading, or select a document from the hub.
+                                </p>
+                            </div>
+                            <button onclick="triggerNewFilePicker()" class="px-4 py-2 rounded-xl bg-readitGreen text-black font-semibold text-xs hover:brightness-105 transition shadow-md shadow-readitGreen/20">
+                                Import PDF File
+                            </button>
+                        </div>
+
+                        <!-- PDF Page Container (Canvas + Interactive TextLayer) -->
+                        <div id="pdf-page-container" class="relative hidden">
+                            <canvas id="pdf-canvas" class="block bg-white"></canvas>
+                            <div id="text-layer" class="textLayer"></div>
+                        </div>
+
+                    </div>
+
+                    <!-- 2. Live Selection Companion Inspector (Beside the Paper) -->
+                    <aside id="sentence-inspector" class="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-4 transition-all duration-200">
+                        
+                        <!-- Inspector Card matching hub.html design system -->
+                        <div class="bg-hubSidebar border border-white/10 rounded-2xl p-5 shadow-2xl backdrop-blur-md space-y-4">
+                            
+                            <!-- Header with Status Badge and Page Counter -->
+                            <div class="flex items-center justify-between pb-3.5 border-b border-white/[0.08]">
+                                <div class="flex items-center gap-2">
+                                    <span id="inspector-status-dot" class="w-2 h-2 rounded-full bg-white/30"></span>
+                                    <span id="inspector-badge" class="text-xs font-semibold uppercase tracking-wider text-white/50">
+                                        Selection Inspector
+                                    </span>
                                 </div>
-                                <div class="text-[#0284C7] italic text-[14px] leading-snug">
-                                    <div>Mathematical Biosciences</div>
-                                    <div>and Engineering</div>
+                                <div class="flex items-center gap-2">
+                                    <span id="inspector-lang-badge" class="font-monoFeature text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-readitGreen border border-white/10">
+                                        EN
+                                    </span>
+                                    <span id="inspector-meta" class="font-monoFeature text-[11px] text-white/50">
+                                        Page 1
+                                    </span>
                                 </div>
                             </div>
-                            <div class="text-[10.5px] text-neutral-600">http://www.aimspress.com/journal/mbe</div>
-                        </div>
-                        <div class="text-[10.5px] text-neutral-800 leading-[1.45]">
-                            <div>MBE, 20(7): 12404–12432.</div>
-                            <div>DOI: 10.3934/mbe.2023552</div>
-                            <div>Received: 10 February 2023</div>
-                            <div>Accepted: 15 May 2023</div>
-                            <div>Published: 23 May 2023</div>
-                        </div>
-                    </div>
 
-                    <!-- Paper Title, Authors & Affiliations -->
-                    <div class="mb-5 space-y-2">
-                        <div class="italic text-xs text-neutral-700">Review</div>
-                        <h1 id="reader-paper-heading" class="font-bold text-xl sm:text-[21px] text-black leading-[1.3]">
-                            Arc fault detection using artificial intelligence: Challenges and benefits
-                        </h1>
-                        <div class="font-bold text-[13px] text-black">
-                            Chunpeng Tian<sup>1</sup>, Zhaoyang Xu<sup>2</sup>, Lukun Wang<sup>1</sup> and Yunjie Liu<sup>3,</sup>*
-                        </div>
-                        <div class="text-[11px] text-neutral-700 leading-[1.45] space-y-0.5 pt-0.5">
-                            <div><sup>1</sup> College of Intelligent Equipment, Shandong University of Science and Technology, Taian 271019, China</div>
-                            <div><sup>2</sup> University of Cambridge, Wellcome-MRC Cambridge Stem Cell Institute, Cambridge, England</div>
-                            <div><sup>3</sup> School of Communication Engineering, Taishan College of Science and Technology, Taian 271038, China</div>
-                        </div>
-                        <div class="text-[11px] text-neutral-800 pt-0.5">
-                            <span class="font-bold">* Correspondence:</span> Email: China.alsiaHappyduobi@gmail.com.
-                        </div>
-                    </div>
-
-                    <!-- Interactive Abstract (Every sentence is hover-selectable & clickable) -->
-                    <div class="text-[14.5px] text-neutral-900 leading-[1.8] text-justify space-y-3">
-                        <div>
-                            <span class="font-bold text-black">Abstract: </span>
-                            <span onclick="selectReaderSentence(0)" id="rsent-0" class="readit-sentence">This systematic review aims to investigate recent developments in the area of arc fault detection.</span>
-                            <span onclick="selectReaderSentence(1)" id="rsent-1" class="readit-sentence active-sentence">The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults and the likelihood of related fires, presenting a matter of considerable concern.</span>
-                            <span onclick="selectReaderSentence(2)" id="rsent-2" class="readit-sentence">To address this challenge, this review focuses on the role of artificial intelligence (AI) in arc fault detection, with the objective of illuminating its advantages and identifying current limitations.</span>
-                            <span onclick="selectReaderSentence(3)" id="rsent-3" class="readit-sentence">Through a meticulous literature selection process, a total of 63 articles were included in the final analysis.</span>
-                            <span onclick="selectReaderSentence(4)" id="rsent-4" class="readit-sentence">Simultaneously, three major challenges were also identified, including missed and false detections, the restricted application of neural networks and the paucity of relevant data.</span>
-                            <span onclick="selectReaderSentence(5)" id="rsent-5" class="readit-sentence">In conclusion, AI has exhibited tremendous potential for transforming the field of arc fault detection and holds substantial promise for enhancing electrical safety.</span>
-                        </div>
-
-                        <!-- Dynamic Inline Before / After Guide Accordion -->
-                        <div id="reader-inline-guide" class="font-sans text-left pt-2 pb-1">
-                            <div class="rounded-2xl bg-[#161B18] text-white p-5 sm:p-6 border border-readitGreen/50 shadow-xl space-y-4">
-                                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
-                                    <div class="flex items-center gap-2">
-                                        <span class="w-2 h-2 rounded-full bg-readitGreen"></span>
-                                        <span id="rguide-badge" class="text-[11px] font-monoFeature uppercase tracking-wider text-readitGreen font-semibold">
-                                            SENTENCE 02 • TRANSLATING IDEA + LEXICAL HIT
+                            <!-- Live Content Zone (Shown when text is selected) -->
+                            <div id="inspector-active-content" class="hidden space-y-3.5">
+                                
+                                <!-- Status Tag & 1-Click Copy -->
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span id="inspector-status-tag" class="text-xs font-monoFeature px-2.5 py-1 rounded-md bg-white/[0.08] text-white/80 border border-white/10">
+                                            Active Selection
+                                        </span>
+                                        <!-- STRICT CITATION PILL (Shows up only if citation is detected) -->
+                                        <span id="inspector-citation-detected-pill" class="hidden text-[10px] font-monoFeature px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/25">
+                                            Citation Detected
                                         </span>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <button onclick="requestGeminiLensForSentence()" id="ask-gemini-btn" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.08] hover:bg-readitGreen hover:text-black border border-white/15 text-white text-[11px] font-medium transition focus:outline-none" title="Request live deep conceptual analysis from Gemini AI">
-                                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-                                            <span>Ask Gemini AI</span>
+                                    <button onclick="copyCurrentSelection()" id="btn-copy-sentence" class="inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 transition focus:outline-none" title="Copy selected text">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                        </svg>
+                                        <span id="copy-text">Copy</span>
+                                    </button>
+                                </div>
+
+                                <!-- Validation Warning Box (Shown only when selection violates rules) -->
+                                <div id="inspector-warning-box" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
+                                    <span class="text-sm shrink-0">⚠️</span>
+                                    <div id="inspector-warning-text" class="leading-relaxed font-medium">
+                                        Selection invalid
+                                    </div>
+                                </div>
+
+                                <!-- Selected Text Display (Clean & High Readability) -->
+                                <div id="inspector-text-wrapper" class="p-3.5 rounded-xl bg-hubCard border border-white/10 shadow-inner max-h-[160px] overflow-y-auto transition-colors">
+                                    <p id="inspector-sent-text" class="text-[13px] leading-relaxed text-white/95 font-sans select-text whitespace-pre-wrap break-words">
+                                        Selected text appears here...
+                                    </p>
+                                </div>
+
+                                <!-- Selection Metadata Pills -->
+                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
+                                    <span id="inspector-sentences" class="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/10 font-monoFeature">
+                                        0 sentences
+                                    </span>
+                                    <span id="inspector-words" class="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/10 font-monoFeature">
+                                        0 words
+                                    </span>
+                                    <span id="inspector-chars" class="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/10 font-monoFeature">
+                                        0 chars
+                                    </span>
+                                </div>
+
+                                <!-- ========================================================= -->
+                                <!-- COGNITIVE LOAD REDUCTION: FOCUSED FEATURE TABS             -->
+                                <!-- ========================================================= -->
+                                <div id="feature-action-zone" class="pt-2.5 border-t border-white/[0.08] space-y-3">
+                                    
+                                    <!-- Drawer Switcher Pills: User chooses what to focus on -->
+                                    <div class="flex items-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10">
+                                        <!-- 1. Idea Translating -->
+                                        <button onclick="switchFeatureDrawer('translating_idea')" 
+                                                id="tab-btn-translating_idea" 
+                                                class="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-readitGreen text-black shadow-sm"
+                                                title="Simplify vocabulary and structure without dropping constraints">
+                                            <span>⚡</span>
+                                            <span class="truncate">Idea</span>
                                         </button>
-                                        <span class="text-[11px] text-neutral-400 hidden sm:inline">Click any sentence to switch</span>
+                                        <!-- 2. Quick Reference -->
+                                        <button onclick="switchFeatureDrawer('quick_reference')" 
+                                                id="tab-btn-quick_reference" 
+                                                class="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-white/70 hover:text-white"
+                                                title="Decode passive actors and ambiguous antecedents">
+                                            <span>🔍</span>
+                                            <span class="truncate">Quick Ref</span>
+                                        </button>
+                                        <!-- 3. Easy Citation (STRICT CONDITIONAL: Only if citation detected in selection) -->
+                                        <button onclick="switchFeatureDrawer('easy_citation')" 
+                                                id="tab-btn-easy_citation" 
+                                                class="hidden flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition items-center justify-center gap-1.5 text-sky-300 hover:text-white"
+                                                title="Unpack citation context, rationale, and supporting claim">
+                                            <span>📚</span>
+                                            <span class="truncate">Citation</span>
+                                        </button>
                                     </div>
+
+                                    <!-- Disabled Hint for Invalid Selections -->
+                                    <p id="translate-disabled-hint" class="hidden text-[11px] text-amber-300/80 text-center italic">
+                                        Select 1 to 4 body sentences to inspect features.
+                                    </p>
+
+                                    <!-- ===================================================== -->
+                                    <!-- DRAWER 1: TRANSLATING IDEA                            -->
+                                    <!-- ===================================================== -->
+                                    <div id="drawer-translating_idea" class="space-y-3">
+                                        <button onclick="triggerCurrentFeatureAction()" id="btn-trigger-idea" class="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-readitGreen hover:bg-readitGreen/90 text-black font-semibold text-xs transition shadow-md shadow-readitGreen/20 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none">
+                                            <span>⚡</span>
+                                            <span id="btn-idea-label">Deconstruct Idea (3s Scan)</span>
+                                        </button>
+
+                                        <div id="idea-explanation-container" class="hidden rounded-2xl bg-[#1C1C1C] border border-readitGreen/30 shadow-2xl overflow-hidden space-y-0 transition-all duration-200">
+                                            <!-- Header -->
+                                            <div class="px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.08] flex items-center justify-between">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-2 h-2 rounded-full bg-readitGreen animate-pulse"></span>
+                                                    <span class="text-xs font-semibold text-readitGreen tracking-wide uppercase">Core Idea</span>
+                                                    <span id="idea-lang-tag" class="text-[10px] font-monoFeature px-1.5 py-0.5 rounded bg-readitGreen/10 text-readitGreen border border-readitGreen/20">EN</span>
+                                                </div>
+                                                <button onclick="copyDrawerContent('translating_idea')" id="btn-copy-idea" class="text-[11px] text-white/70 hover:text-white px-2 py-1 rounded bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 transition flex items-center gap-1.5 focus:outline-none" title="Copy Translation">
+                                                    <span>📋</span>
+                                                    <span id="copy-idea-label">Copy</span>
+                                                </button>
+                                            </div>
+                                            <!-- Modules -->
+                                            <div class="p-3.5 space-y-2.5">
+                                                <!-- Core Action -->
+                                                <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/25 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                                        <span>⚡</span>
+                                                        <span id="label-core-action">Core Action (Actor → Action → Outcome)</span>
+                                                    </div>
+                                                    <p id="idea-core-action" class="text-xs font-medium text-emerald-100 leading-snug select-text"></p>
+                                                </div>
+                                                <!-- Plain Meaning -->
+                                                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                                                        <span>📖</span>
+                                                        <span id="label-plain-meaning">Plain Language (0 Dropped Constraints)</span>
+                                                    </div>
+                                                    <p id="idea-plain-meaning" class="text-xs text-white/90 leading-relaxed select-text font-sans"></p>
+                                                </div>
+                                                <!-- Why It Matters -->
+                                                <div class="p-3 rounded-xl bg-sky-950/25 border border-sky-500/25 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                                                        <span>🎯</span>
+                                                        <span id="label-why-matters">Why It Matters</span>
+                                                    </div>
+                                                    <p id="idea-takeaway" class="text-xs text-sky-100 leading-snug select-text"></p>
+                                                </div>
+                                                <!-- Context Anchor -->
+                                                <div class="p-3 rounded-xl bg-purple-950/25 border border-purple-500/25 space-y-1">
+                                                    <div class="flex items-center justify-between">
+                                                        <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                                            <span>🔒</span>
+                                                            <span id="label-context-anchor">Context Anchor</span>
+                                                        </div>
+                                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-200 border border-purple-500/20 font-monoFeature">Paper Grounding</span>
+                                                    </div>
+                                                    <p id="idea-context-anchor" class="text-xs text-purple-100/90 leading-relaxed font-sans select-text"></p>
+                                                </div>
+                                            </div>
+                                            <div id="idea-explanation-error" class="hidden p-3.5 pt-0"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ===================================================== -->
+                                    <!-- DRAWER 2: QUICK REFERENCE (PASSIVE & ANTECEDENTS)      -->
+                                    <!-- ===================================================== -->
+                                    <div id="drawer-quick_reference" class="hidden space-y-3">
+                                        <button onclick="triggerCurrentFeatureAction()" id="btn-trigger-quickref" class="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-white/[0.1] hover:bg-white/[0.16] text-white font-semibold text-xs border border-white/15 transition disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none">
+                                            <span>🔍</span>
+                                            <span id="btn-quickref-label">Decode Passive &amp; Antecedents</span>
+                                        </button>
+
+                                        <div id="quickref-container" class="hidden rounded-2xl bg-[#1C1C1C] border border-amber-500/30 shadow-2xl overflow-hidden space-y-0 transition-all duration-200">
+                                            <!-- Header -->
+                                            <div class="px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.08] flex items-center justify-between">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                                                    <span class="text-xs font-semibold text-amber-300 tracking-wide uppercase">Quick Reference</span>
+                                                    <span class="text-[10px] font-monoFeature px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20">Actor &amp; Referent</span>
+                                                </div>
+                                                <button onclick="copyDrawerContent('quick_reference')" id="btn-copy-quickref" class="text-[11px] text-white/70 hover:text-white px-2 py-1 rounded bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 transition flex items-center gap-1.5 focus:outline-none" title="Copy Reference">
+                                                    <span>📋</span>
+                                                    <span id="copy-quickref-label">Copy</span>
+                                                </button>
+                                            </div>
+                                            <!-- Modules -->
+                                            <div class="p-3.5 space-y-2.5">
+                                                <!-- Real Subject / Actor -->
+                                                <div class="p-3 rounded-xl bg-amber-950/25 border border-amber-500/25 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                                                        <span>🎯</span>
+                                                        <span id="label-real-subject">Who Actually Did This? (Real Subject)</span>
+                                                    </div>
+                                                    <p id="quickref-real-subject" class="text-xs font-medium text-amber-100 leading-snug select-text"></p>
+                                                </div>
+                                                <!-- Active Rewrite -->
+                                                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/60 flex items-center gap-1.5">
+                                                        <span>⚡</span>
+                                                        <span id="label-active-rewrite">Direct Active Voice Rewrite</span>
+                                                    </div>
+                                                    <p id="quickref-active-rewrite" class="text-xs text-white/90 leading-relaxed select-text font-sans"></p>
+                                                </div>
+                                                <!-- Passive Phrases Detected -->
+                                                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-1.5">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                                                        <span>🧩</span>
+                                                        <span>Passive Phrases Resolved</span>
+                                                    </div>
+                                                    <div id="quickref-passive-container" class="flex flex-wrap gap-1.5"></div>
+                                                </div>
+                                                <!-- Antecedents & Referents -->
+                                                <div class="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-1.5">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                                                        <span>🔗</span>
+                                                        <span>Ambiguous Referents &amp; Antecedents</span>
+                                                    </div>
+                                                    <div id="quickref-antecedents-container" class="space-y-1 text-xs"></div>
+                                                </div>
+                                            </div>
+                                            <div id="quickref-error" class="hidden p-3.5 pt-0"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ===================================================== -->
+                                    <!-- DRAWER 3: EASY CITATION (CONDITIONAL ONLY)             -->
+                                    <!-- ===================================================== -->
+                                    <div id="drawer-easy_citation" class="hidden space-y-3">
+                                        <button onclick="triggerCurrentFeatureAction()" id="btn-trigger-citation" class="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-semibold text-xs border border-sky-400/30 transition disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none">
+                                            <span>📚</span>
+                                            <span id="btn-citation-label">Unpack Citation Context</span>
+                                        </button>
+
+                                        <div id="citation-container" class="hidden rounded-2xl bg-[#1C1C1C] border border-sky-500/30 shadow-2xl overflow-hidden space-y-0 transition-all duration-200">
+                                            <!-- Header -->
+                                            <div class="px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.08] flex items-center justify-between">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+                                                    <span class="text-xs font-semibold text-sky-300 tracking-wide uppercase">Easy Citation</span>
+                                                    <span id="citation-label-badge" class="text-[10px] font-monoFeature px-1.5 py-0.5 rounded bg-sky-400/15 text-sky-200 border border-sky-400/25">[1]</span>
+                                                </div>
+                                                <button onclick="copyDrawerContent('easy_citation')" id="btn-copy-citation" class="text-[11px] text-white/70 hover:text-white px-2 py-1 rounded bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 transition flex items-center gap-1.5 focus:outline-none" title="Copy Citation">
+                                                    <span>📋</span>
+                                                    <span id="copy-citation-label">Copy</span>
+                                                </button>
+                                            </div>
+                                            <!-- Modules -->
+                                            <div class="p-3.5 space-y-2.5">
+                                                <!-- Reference Title / Work -->
+                                                <div class="p-3 rounded-xl bg-sky-950/25 border border-sky-500/25 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                                                        <span>🏷️</span>
+                                                        <span id="label-ref-title">Cited Work / Foundation</span>
+                                                    </div>
+                                                    <p id="citation-ref-title" class="text-xs font-medium text-sky-100 leading-snug select-text"></p>
+                                                </div>
+                                                <!-- Supporting Claim in this paper -->
+                                                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-white/60 flex items-center gap-1.5">
+                                                        <span>📌</span>
+                                                        <span id="label-supporting-claim">Supporting Claim Grounded on Citation</span>
+                                                    </div>
+                                                    <p id="citation-supporting-claim" class="text-xs text-white/90 leading-relaxed select-text font-sans"></p>
+                                                </div>
+                                                <!-- Why Authors Cited This -->
+                                                <div class="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-1">
+                                                    <div class="text-[10px] font-monoFeature font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                                        <span>💡</span>
+                                                        <span id="label-why-cited">Why the Authors Cited This</span>
+                                                    </div>
+                                                    <p id="citation-why-cited" class="text-xs text-emerald-100/90 leading-relaxed select-text font-sans"></p>
+                                                </div>
+                                            </div>
+                                            <div id="citation-error" class="hidden p-3.5 pt-0"></div>
+                                        </div>
+                                    </div>
+
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
-                                        <div class="text-[10px] font-monoFeature uppercase text-amber-300">Before (Selected Sentence)</div>
-                                        <p id="rguide-before" class="text-xs text-neutral-300 italic leading-relaxed">
-                                            "The rising demand for electricity and concomitant expansion of energy systems has resulted in a heightened risk of arc faults..."
-                                        </p>
-                                    </div>
-                                    <div class="p-3.5 rounded-xl bg-readitGreen/10 border border-readitGreen/35 space-y-1">
-                                        <div class="text-[10px] font-monoFeature uppercase text-readitGreen" id="rguide-after-label">After (READit Plain Breakdown)</div>
-                                        <p id="rguide-after" class="text-xs sm:text-[13px] text-white font-medium leading-relaxed">
-                                            "As electricity use grows and power grids expand at the same time, dangerous electrical sparks (arc faults) and fires are much more likely to happen."
-                                        </p>
-                                    </div>
-                                </div>
+                            </div>
 
-                                <div id="rguide-extra" class="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-[11px]">
-                                    <span class="text-neutral-400">Detected Terms:</span>
-                                    <span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30">
-                                        <strong>concomitant</strong> (C2) → happening at the same time
-                                    </span>
-                                    <span class="px-2.5 py-0.5 rounded bg-amber-400/15 text-amber-200 border border-amber-400/30">
-                                        <strong>heightened</strong> (C1) → increased
-                                    </span>
+                            <!-- Empty State (When nothing is selected) -->
+                            <div id="inspector-empty-state" class="py-12 px-4 text-center flex flex-col items-center justify-center space-y-3">
+                                <div class="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-white/40">
+                                    <svg class="w-6 h-6 text-readitGreen/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-semibold text-white/80">Interactive Lens Companion</h4>
+                                    <p class="text-[11px] text-white/45 mt-1 max-w-[260px] leading-relaxed">
+                                        Select 1 to 4 body sentences to trigger <strong class="text-readitGreen">⚡ Idea</strong>, <strong class="text-white/80">🔍 Quick Ref</strong>, or <strong class="text-sky-300">📚 Easy Citation</strong>.
+                                    </p>
                                 </div>
                             </div>
+
                         </div>
 
-                        <div class="pt-1 pb-3 border-b-2 border-neutral-800 text-[12px] text-neutral-900">
-                            <span class="font-bold">Keywords:</span> arc fault detection; artificial intelligence; detection methods; arc fault location; electric fire
-                        </div>
-
-                        <!-- Section 1: Introduction -->
-                        <div class="pt-2">
-                            <div class="font-bold text-black text-[13.5px] mb-1.5">1. Introduction</div>
-                            <p class="indent-6">
-                                <span onclick="selectReaderSentence(6)" id="rsent-6" class="readit-sentence">The proliferation of urbanization and industrialization has resulted in a surging demand for energy, necessitating the development of new and efficient energy systems.</span>
-                                <span onclick="selectReaderSentence(7)" id="rsent-7" class="readit-sentence">Nonetheless, the outdated nature of current photovoltaic and energy storage systems has given rise to numerous incidents of arc faults [1].</span>
-                            </p>
-                        </div>
-                    </div>
+                    </aside>
 
                 </div>
+            </main>
+
+            <!-- FLOATING ACTIONS BAR (Near Text Selection on Academic Paper Sheet) -->
+            <div id="floating-actions-bar" 
+                 onmousedown="event.preventDefault();"
+                 class="fixed hidden z-50 items-center gap-1.5 p-1 rounded-full bg-[#161616]/95 border border-white/20 shadow-[0_12px_36px_rgba(0,0,0,0.9),0_0_16px_rgba(74,222,128,0.25)] text-xs font-semibold backdrop-blur-md select-none transition-all">
+                <button onclick="handleFloatingFeatureClick('translating_idea', event)"
+                        id="floating-btn-idea"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-readitGreen text-black font-semibold hover:brightness-105 active:scale-95 transition cursor-pointer"
+                        title="Translating Idea: Simplify academic language, 0 dropped constraints">
+                    <span>⚡</span>
+                    <span>Idea</span>
+                </button>
+                <button onclick="handleFloatingFeatureClick('quick_reference', event)"
+                        id="floating-btn-quickref"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.16] text-white/90 active:scale-95 transition cursor-pointer border border-white/10"
+                        title="Quick Reference: Decode passive actors and antecedents">
+                    <span>🔍</span>
+                    <span>Quick Ref</span>
+                </button>
+                <button id="floating-btn-citation"
+                        onclick="handleFloatingFeatureClick('easy_citation', event)"
+                        class="hidden items-center gap-1 px-3 py-1.5 rounded-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/30 active:scale-95 transition cursor-pointer"
+                        title="Easy Citation: Unpack cited source context and paper claim">
+                    <span>📚</span>
+                    <span>Citation</span>
+                </button>
             </div>
 
             <!-- Sleek Floating Bottom Language Action Bar (EN / ID) -->
@@ -569,8 +826,8 @@
                 <button onclick="closeGuideVideoModal()" class="px-4 py-2 rounded-full border border-white/15 text-white/75 hover:text-white text-xs font-medium transition">
                     Close
                 </button>
-                <button onclick="closeGuideVideoModal(); openSmartReader('Demo File');" class="px-4 py-2 rounded-full bg-readitGreen text-black text-xs font-semibold hover:brightness-110 transition">
-                    Try in Demo File →
+                <button onclick="closeGuideVideoModal(); triggerNewFilePicker();" class="px-4 py-2 rounded-full bg-readitGreen text-black text-xs font-semibold hover:brightness-110 transition">
+                    Import PDF File →
                 </button>
             </div>
         </div>

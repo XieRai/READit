@@ -92,3 +92,10 @@ async def reader():
     """Redirect legacy reader route to Document Hub SPA."""
     return RedirectResponse(url="/hub", status_code=307)
 
+
+@app.get("/test-reconstruct", response_class=HTMLResponse)
+async def test_reconstruct_page(request: Request):
+    """Serve the isolated PDF re-rendering and paragraph extraction sandbox."""
+    return templates.TemplateResponse(request=request, name="test_reconstruct.html")
+
+
