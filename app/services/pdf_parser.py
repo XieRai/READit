@@ -57,7 +57,27 @@ class PdfParserService:
             logger.warning("spaCy initialization fallback: %s", e)
             self._nlp = None
 
-        return self._nlp
+    def _is_suspicious_title(self, title: str) -> bool:
+        """Check if an extracted title candidate is a generic label or journal artifact."""
+        if not title or len(title.strip()) < 5:
+            return True
+        clean = title.strip().lower()
+        if clean.startswith("type ") or clean.startswith("type:") or clean.startswith("published"):
+            return True
+        if clean.startswith("article type") or clean.startswith("section:"):
+            return True
+        if clean in {
+            "article", "review", "methods", "original research", "brief report",
+            "editorial", "untitled", "untitled document", "untitled research paper",
+            "open access", "full paper", "case report", "short communication",
+            "regular paper", "invited paper", "research article", "perspective"
+        }:
+            return True
+        if re.search(r'\.(pdf|docx?|tex)$', clean):
+            return True
+        if clean.startswith("microsoft word") or clean.startswith("latex"):
+            return True
+        return False
 
     def parse_pdf_bytes(self, pdf_bytes: bytes, max_pages: int = 20) -> dict[str, Any]:
         """
@@ -77,6 +97,10 @@ class PdfParserService:
         doc_title = (meta.get("title") or "").strip()
         doc_author = (meta.get("author") or "").strip()
 
+        # Discard generic metadata titles or journal type markers (e.g. "TYPE Methods", "Article")
+        if self._is_suspicious_title(doc_title):
+            doc_title = ""
+
         pages_to_process = min(page_count, max_pages)
         ordered_blocks_all_pages: list[str] = []
 
@@ -90,36 +114,55 @@ class PdfParserService:
 
         doc.close()
 
-        # Heuristic metadata extraction from first page blocks if metadata is empty
+        # Heuristic metadata extraction from first page blocks if metadata is empty or generic
         if ordered_blocks_all_pages:
-            first_blk = ordered_blocks_all_pages[0]
             if not doc_title:
-                # First short block is typically the title
-                lines = first_blk.split("\n")
-                if len(lines[0]) < 120:
-                    doc_title = lines[0].strip()
+                for blk in ordered_blocks_all_pages[:6]:
+                    candidate = blk.strip()
+                    lines = [l.strip() for l in candidate.split("\n") if l.strip()]
+                    first_line = lines[0] if lines else candidate
+                    if not self._is_suspicious_title(first_line) and 15 < len(first_line) < 220:
+                        doc_title = first_line
+                        break
+                    elif not self._is_suspicious_title(candidate) and 15 < len(candidate) < 220:
+                        doc_title = candidate
+                        break
 
-            # Check if second block is author
-            if len(ordered_blocks_all_pages) > 1 and not doc_author:
-                second_blk = ordered_blocks_all_pages[1]
-                if re.match(r'^(authors?|by)\s*:', second_blk, re.IGNORECASE):
-                    doc_author = re.sub(r'^(authors?|by)\s*:\s*', '', second_blk, flags=re.IGNORECASE).strip()
+            # Check if second or third block is author
+            if not doc_author:
+                for blk in ordered_blocks_all_pages[1:5]:
+                    if re.match(r'^(authors?|by)\s*:', blk, re.IGNORECASE):
+                        doc_author = re.sub(r'^(authors?|by)\s*:\s*', '', blk, flags=re.IGNORECASE).strip()
+                        break
 
         # Extract sentences via spaCy block-by-block
         sentences = self._extract_sentences_from_blocks(ordered_blocks_all_pages, doc_title, doc_author)
 
         if not doc_title and sentences:
-            doc_title = sentences[0]["orig"].replace('"', '')[:80]
+            for s in sentences[:3]:
+                cand = s["orig"].replace('"', '').strip()
+                if not self._is_suspicious_title(cand):
+                    doc_title = cand[:120]
+                    break
+
+        # Assemble clean, de-hyphenated ordered text for prebake context extraction
+        clean_text = "\n\n".join(ordered_blocks_all_pages[:15])[:12000]
+
+        # Extract DOI if present
+        doi_match = re.search(r'10\.\d{4,9}/[-._;()/:A-Za-z0-9]+', clean_text)
+        extracted_doi = doi_match.group(0) if doi_match else None
 
         return {
             "success": True,
             "file_hash": file_hash,
             "title": doc_title or "Untitled Research Paper",
             "author": doc_author,
+            "doi": extracted_doi,
             "page_count": page_count,
             "pages_parsed": pages_to_process,
             "sentence_count": len(sentences),
             "sentences": sentences,
+            "extracted_text": clean_text,
         }
 
     def _extract_page_ordered_blocks(self, page) -> list[str]:

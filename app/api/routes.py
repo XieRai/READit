@@ -121,7 +121,8 @@ async def prebake_paper(payload: PrebakeRequest) -> PrebakeResponse:
 async def parse_document(file: UploadFile = File(...)) -> dict[str, Any]:
     """
     Parse an uploaded research PDF using PyMuPDF and spaCy.
-    Extracts two-column academic reading order, removes hyphens, and segments sentences.
+    Extracts two-column academic reading order, removes hyphens, segments sentences,
+    and generates the global prebake context (domain, core_problem, method, key_terms).
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -135,6 +136,27 @@ async def parse_document(file: UploadFile = File(...)) -> dict[str, Any]:
 
         parsed_data = _pdf_parser.parse_pdf_bytes(content)
         parsed_data["filename"] = file.filename
+
+        # Generate prebake context from the clean, de-hyphenated academic text
+        extracted_text = (
+            parsed_data.get("extracted_text")
+            or "\n".join(s["orig"] for s in parsed_data.get("sentences", [])[:35])
+        )
+        prebake = await _llm.prebake_context(
+            paper_content=extracted_text,
+            title=parsed_data.get("title", "")
+        )
+        parsed_data["prebake_context"] = prebake
+
+        # Verify title is authentic: if still suspicious/generic, use prebake title or clean filename
+        prebake_title = (prebake.get("title") or "").strip() if prebake else ""
+        if _pdf_parser._is_suspicious_title(parsed_data.get("title", "")):
+            if prebake_title and not _pdf_parser._is_suspicious_title(prebake_title):
+                parsed_data["title"] = prebake_title
+            else:
+                clean_name = file.filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").strip()
+                parsed_data["title"] = clean_name
+
         return parsed_data
     except Exception as e:
         logger.exception("Failed to parse PDF: %s", e)

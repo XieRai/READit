@@ -346,7 +346,7 @@
                 <!-- Right Controls: Paper Context Pill & Page Navigation -->
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
                     <!-- Paper Context Status Pill (Anti-Hallucination Engine) -->
-                    <div id="paper-context-pill" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/10 text-xs text-white/70 max-w-[220px] truncate" title="Global Paper Context">
+                    <div id="paper-context-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/10 text-xs text-white/70 max-w-[170px] sm:max-w-[220px] truncate" title="Global Paper Context">
                         <span id="context-status-dot" class="w-2 h-2 rounded-full bg-white/30 shrink-0"></span>
                         <span id="context-status-label" class="truncate text-[11px] font-monoFeature">Context: Idle</span>
                     </div>
@@ -801,9 +801,9 @@
 
             </div>
 
-            <!-- Floating Bottom Explanation Peek Capsule (Notification with bottom bump animation) -->
+            <!-- Floating Bottom Explanation Peek Capsule (Mobile Only: Notification with bottom bump animation) -->
             <div id="bottom-explanation-peek" 
-                 class="fixed bottom-20 sm:bottom-22 left-1/2 -translate-x-1/2 z-40 hidden transition-all duration-200 pointer-events-auto">
+                 class="lg:hidden fixed bottom-20 sm:bottom-22 left-1/2 -translate-x-1/2 z-40 hidden transition-all duration-200 pointer-events-auto">
                 <div id="peek-capsule-btn" 
                      class="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#1A1A1A]/95 backdrop-blur-xl border border-readitGreen/40 shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(74,222,128,0.25)] text-white cursor-pointer select-none group hover:border-readitGreen transition-all active:scale-95 touch-manipulation min-h-[44px]"
                      onclick="openExplanationBottomDrawer()">
@@ -835,11 +835,11 @@
                 </div>
             </div>
 
-            <!-- Bottom Explanation Drawer Backdrop -->
-            <div id="bottom-explanation-backdrop" onclick="closeExplanationBottomDrawer()" class="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs hidden opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <!-- Bottom Explanation Drawer Backdrop (Mobile Only) -->
+            <div id="bottom-explanation-backdrop" onclick="closeExplanationBottomDrawer()" class="lg:hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-xs hidden opacity-0 transition-opacity duration-300 pointer-events-none"></div>
 
-            <!-- Bottom Explanation Drawer Sheet (Slides up on demand, smoothly resizable/expandable) -->
-            <div id="bottom-explanation-drawer" class="fixed bottom-0 left-0 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-out flex justify-center pointer-events-none">
+            <!-- Bottom Explanation Drawer Sheet (Mobile Only: Slides up on demand, smoothly resizable/expandable) -->
+            <div id="bottom-explanation-drawer" class="lg:hidden fixed bottom-0 left-0 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-out flex justify-center pointer-events-none">
                 <div id="bottom-drawer-sheet" class="pointer-events-auto w-full max-w-2xl bg-[#181818]/98 backdrop-blur-2xl border-t border-x border-white/15 rounded-t-[28px] shadow-[0_-16px_48px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden transition-all duration-300 ease-out h-[62vh] max-h-[96vh]">
                     
                     <!-- Header with Grab Bar, Title, Copy & Close -->

@@ -73,6 +73,7 @@ async function initAccountState() {
             const { data: { session } } = await sb.auth.getSession();
             if (session && session.user) {
                 applySupabaseUser(session.user);
+                loadUserLibraryFromSupabase();
             } else {
                 loadFallbackUser();
             }
@@ -83,11 +84,14 @@ async function initAccountState() {
                     if (event === 'SIGNED_IN') {
                         showHubToast(`Welcome, ${currentUser.name}`);
                         triggerPendingUploadsIfAny();
+                        loadUserLibraryFromSupabase();
                     }
                 } else if (event === 'SIGNED_OUT') {
                     currentUser = null;
                     isLoggedIn = false;
                     localStorage.removeItem('readit_user');
+                    hubDocuments = hubDocuments.filter(d => !d.isCloudOnly);
+                    renderHubDocuments();
                     updateAccountUI();
                 }
             });
@@ -326,6 +330,20 @@ function triggerPendingUploadsIfAny() {
         pendingUploadFiles = [];
         handlePdfFiles(files);
     }
+    // Automatically backup and sync any open local documents into cloud account
+    if (isLoggedIn && currentUser) {
+        for (const doc of hubDocuments) {
+            if (doc.file && !doc.isCloudOnly) {
+                const parsedData = {
+                    file_hash: doc.fileHash,
+                    title: doc.title,
+                    page_count: doc.pageCount,
+                    prebake_context: doc.prebakeContext
+                };
+                saveNewDocumentToCloud(doc, doc.file, parsedData);
+            }
+        }
+    }
 }
 
 function initGoogleIdentity() {
@@ -538,6 +556,8 @@ async function handleLogoutAction() {
     isLoggedIn = false;
     currentUser = null;
     localStorage.removeItem('readit_user');
+    hubDocuments = hubDocuments.filter(d => !d.isCloudOnly);
+    renderHubDocuments();
     updateAccountUI();
     showHubToast('Signed out of READit');
 }
@@ -723,8 +743,21 @@ function initGlobalDragAndDrop() {
 }
 
 // =====================================================================
-// DIRECT CLIENT-SIDE PDF IMPORT & OPENING (NO BACKEND PARSE)
+// FILE FINGERPRINTING & HIGH-FIDELITY PDF IMPORT
 // =====================================================================
+async function computeFileSha256(file) {
+    if (!file) return null;
+    try {
+        const buffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+        console.warn('Crypto SHA-256 error:', e);
+        return null;
+    }
+}
+
 function processAndOpenPdf(file) {
     const cleanTitle = file.name.replace(/\.pdf$/i, '');
     const fileUrl = URL.createObjectURL(file);
@@ -732,11 +765,14 @@ function processAndOpenPdf(file) {
 
     const newDoc = {
         id: docId,
+        fileHash: null,
         title: cleanTitle.length > 36 ? cleanTitle.substring(0, 33) + '...' : cleanTitle,
         fullTitle: file.name,
         fileUrl: fileUrl,
         file: file,
-        pageCount: 1
+        pageCount: 1,
+        prebakeContext: null,
+        storagePath: null
     };
 
     hubDocuments.unshift(newDoc);
@@ -744,6 +780,16 @@ function processAndOpenPdf(file) {
 
     openDocumentInTab(newDoc);
     showHubToast(`Loaded "${newDoc.title}" in Smart Reader`);
+
+    // Asynchronously fingerprint file and resolve prebake
+    computeFileSha256(file).then(hash => {
+        if (hash) {
+            newDoc.fileHash = hash;
+            const tab = openTabs.find(t => t.id === newDoc.id);
+            if (tab) tab.fileHash = hash;
+            resolveDocumentPrebake(newDoc);
+        }
+    });
 }
 
 // =====================================================================
@@ -1188,11 +1234,14 @@ function openDocumentInTab(doc) {
     } else {
         openTabs.push({
             id: doc.id,
+            fileHash: doc.fileHash || null,
             title: doc.title,
             fullTitle: doc.fullTitle || doc.title,
             fileUrl: doc.fileUrl,
             file: doc.file,
-            pageCount: doc.pageCount || 1
+            pageCount: doc.pageCount || 1,
+            prebakeContext: doc.prebakeContext || null,
+            storagePath: doc.storagePath || null
         });
         activeTabId = doc.id;
     }
@@ -1213,9 +1262,32 @@ function openDocumentInTab(doc) {
     setReaderLang(currentReaderLang);
 }
 
-function openSmartReader(docIdentifier) {
+async function openSmartReader(docIdentifier) {
     let targetDoc = hubDocuments.find(d => d.id === docIdentifier || d.title.toLowerCase() === docIdentifier.toLowerCase());
     if (!targetDoc) return;
+
+    // If document is stored in cloud and hasn't been downloaded locally yet
+    if (targetDoc.isCloudOnly && targetDoc.storagePath && !targetDoc.fileUrl) {
+        const sb = getSupabase();
+        if (sb) {
+            showHubToast('Downloading paper from cloud storage...');
+            try {
+                const { data: blob, error } = await sb.storage.from('papers').download(targetDoc.storagePath);
+                if (blob) {
+                    targetDoc.file = blob;
+                    targetDoc.fileUrl = URL.createObjectURL(blob);
+                    targetDoc.isCloudOnly = false;
+                } else {
+                    showHubToast('Could not download paper: ' + (error ? error.message : 'Not found'));
+                    return;
+                }
+            } catch (err) {
+                showHubToast('Download failed: ' + err.message);
+                return;
+            }
+        }
+    }
+
     openDocumentInTab(targetDoc);
 }
 
@@ -1223,6 +1295,40 @@ function closeSmartReader() {
     const readerView = document.getElementById('hub-reader-view');
     const dashView = document.getElementById('hub-dashboard-view');
     const mobileHeader = document.getElementById('hub-mobile-header');
+
+    // 1. Record last read page on the active tab and sync to Supabase
+    const activeTab = openTabs.find(t => t.id === activeTabId);
+    if (activeTab && currentPdf) {
+        activeTab.lastReadPage = currentPageNum;
+        activeTab.progressPct = Math.round((currentPageNum / totalPages) * 100);
+
+        const hubDoc = hubDocuments.find(d => d.id === activeTab.id || (activeTab.fileHash && d.fileHash === activeTab.fileHash));
+        if (hubDoc) {
+            hubDoc.lastReadPage = currentPageNum;
+            hubDoc.progressPct = activeTab.progressPct;
+        }
+        renderHubDocuments();
+
+        // If signed in, update user_documents on Supabase
+        const sb = getSupabase();
+        if (sb && isLoggedIn && currentUser && activeTab.fileHash) {
+            sb.from('user_documents')
+                .update({
+                    last_read_page: currentPageNum,
+                    progress_pct: activeTab.progressPct,
+                    last_opened_at: new Date().toISOString()
+                })
+                .eq('user_id', currentUser.id)
+                .eq('file_hash', activeTab.fileHash)
+                .then(({ error }) => {
+                    if (error) {
+                        console.warn('Could not update last_read_page on Supabase:', error.message);
+                    } else {
+                        console.log(`✅ Synced last_read_page (${currentPageNum}) to Supabase user_documents`);
+                    }
+                });
+        }
+    }
 
     togglePaperSwitcherDrawer(false);
     closeExplanationBottomDrawer();
@@ -1277,70 +1383,398 @@ let currentRenderTask = null;
 let currentTextLayerTask = null;
 let resizeDebounceTimer = null;
 
-async function prebakePaperContext(pdfDoc) {
+// =====================================================================
+// CLOUD STORAGE & PREBAKE CONTEXT RESOLUTION (PDF_PARSER + SUPABASE CACHE)
+// =====================================================================
+
+function isSuspiciousTitle(t) {
+    if (!t || typeof t !== 'string' || t.trim().length < 4) return true;
+    const clean = t.trim().toLowerCase();
+    if (clean.startsWith('type ') || clean.startsWith('type:') || clean.startsWith('published')) return true;
+    if (clean.startsWith('article type') || clean.startsWith('section:')) return true;
+    return ['article', 'review', 'methods', 'untitled', 'untitled research paper', 'research article'].includes(clean);
+}
+
+async function loadUserLibraryFromSupabase() {
+    const sb = getSupabase();
+    if (!sb || !isLoggedIn || !currentUser) return;
+
+    try {
+        const { data, error } = await sb
+            .from('user_documents')
+            .select(`
+                id,
+                custom_title,
+                last_read_page,
+                progress_pct,
+                last_opened_at,
+                file_hash,
+                documents (
+                    file_hash,
+                    title,
+                    authors,
+                    doi,
+                    page_count,
+                    prebake_context,
+                    storage_path
+                )
+            `)
+            .order('last_opened_at', { ascending: false });
+
+        if (error) {
+            console.warn('Could not load user library from Supabase:', error.message);
+            return;
+        }
+
+        if (data && data.length > 0) {
+            for (const item of data) {
+                const docMeta = item.documents || {};
+                const hash = item.file_hash;
+                const existing = hubDocuments.find(d => d.fileHash === hash);
+                let paperTitle = item.custom_title || docMeta.title || 'Cloud Paper';
+                if (isSuspiciousTitle(paperTitle)) {
+                    if (docMeta.prebake_context && docMeta.prebake_context.title && !isSuspiciousTitle(docMeta.prebake_context.title)) {
+                        paperTitle = docMeta.prebake_context.title;
+                    }
+                }
+
+                if (!existing) {
+                    hubDocuments.push({
+                        id: 'cloud-' + item.id,
+                        fileHash: hash,
+                        title: paperTitle,
+                        fullTitle: docMeta.title || paperTitle,
+                        pageCount: docMeta.page_count || 1,
+                        lastReadPage: item.last_read_page || 1,
+                        progressPct: item.progress_pct || 0,
+                        storagePath: docMeta.storage_path,
+                        prebakeContext: docMeta.prebake_context,
+                        isCloudOnly: true
+                    });
+                } else {
+                    existing.lastReadPage = item.last_read_page || existing.lastReadPage || 1;
+                    existing.progressPct = item.progress_pct || existing.progressPct || 0;
+                    if (isSuspiciousTitle(existing.title)) {
+                        existing.title = paperTitle;
+                        existing.fullTitle = paperTitle;
+                    }
+                }
+            }
+            renderHubDocuments();
+        }
+    } catch (e) {
+        console.warn('loadUserLibraryFromSupabase error:', e);
+    }
+}
+
+async function saveNewDocumentToCloud(doc, file, parsedData) {
+    const sb = getSupabase();
+    if (!sb || !isLoggedIn || !currentUser) return;
+
+    const fileHash = doc.fileHash || parsedData.file_hash;
+    if (!fileHash) return;
+    const storagePath = `${currentUser.id}/${fileHash}.pdf`;
+
+    const prebakeTitle = (parsedData.prebake_context && parsedData.prebake_context.title) || '';
+    let finalTitle = parsedData.title || doc.title || 'Research Paper';
+    if (isSuspiciousTitle(finalTitle) && prebakeTitle && !isSuspiciousTitle(prebakeTitle)) {
+        finalTitle = prebakeTitle;
+    } else if (isSuspiciousTitle(finalTitle) && doc.fullTitle) {
+        finalTitle = doc.fullTitle.replace(/\.pdf$/i, '');
+    }
+
+    try {
+        // 1. Upload PDF to Supabase Storage 'papers' bucket under user's private folder
+        if (file) {
+            console.log('Uploading PDF to Supabase Storage:', storagePath);
+            const { error: uploadError } = await sb.storage
+                .from('papers')
+                .upload(storagePath, file, {
+                    contentType: 'application/pdf',
+                    cacheControl: '3600',
+                    upsert: true
+                });
+
+            if (uploadError) {
+                console.warn('Storage upload error:', uploadError.message);
+            } else {
+                console.log('✅ PDF uploaded to Supabase Storage!');
+                doc.storagePath = storagePath;
+            }
+        }
+
+        // 2. Upsert public.documents (prebake context cached for everyone!)
+        const docRecord = {
+            file_hash: fileHash,
+            storage_path: storagePath,
+            title: finalTitle,
+            authors: parsedData.author ? [parsedData.author] : [],
+            doi: parsedData.doi || null,
+            page_count: parsedData.page_count || doc.pageCount || 1,
+            prebake_context: parsedData.prebake_context || null,
+            parsed_structure: {
+                sentence_count: parsedData.sentence_count || 0
+            },
+            last_accessed_at: new Date().toISOString()
+        };
+
+        const { error: docError } = await sb
+            .from('documents')
+            .upsert(docRecord, { onConflict: 'file_hash' });
+
+        if (docError) {
+            console.warn('Error saving to public.documents:', docError.message);
+        }
+
+        // 3. Upsert user_documents (link to current user library)
+        const userDocRecord = {
+            user_id: currentUser.id,
+            file_hash: fileHash,
+            custom_title: finalTitle,
+            last_read_page: doc.lastReadPage || 1,
+            progress_pct: doc.progressPct || 0,
+            last_opened_at: new Date().toISOString()
+        };
+
+        const { error: userDocError } = await sb
+            .from('user_documents')
+            .upsert(userDocRecord, { onConflict: 'user_id,file_hash' });
+
+        if (userDocError) {
+            console.warn('Error saving to user_documents:', userDocError.message);
+        } else {
+            showHubToast('Synced to your cloud library');
+        }
+    } catch (err) {
+        console.warn('saveNewDocumentToCloud error:', err);
+    }
+}
+
+async function syncUserDocumentToCloud(doc, fileHash, existingStoragePath) {
+    const sb = getSupabase();
+    if (!sb || !isLoggedIn || !currentUser) return;
+
+    try {
+        let storagePath = existingStoragePath;
+        if (doc.file && (!storagePath || !storagePath.startsWith(currentUser.id))) {
+            const userStoragePath = `${currentUser.id}/${fileHash}.pdf`;
+            const { error: upErr } = await sb.storage
+                .from('papers')
+                .upload(userStoragePath, doc.file, {
+                    contentType: 'application/pdf',
+                    cacheControl: '3600',
+                    upsert: true
+                });
+            if (!upErr) {
+                storagePath = userStoragePath;
+                doc.storagePath = storagePath;
+            }
+        }
+
+        // Query existing user_documents record to retrieve user's saved last_read_page
+        const { data: existingUserDoc } = await sb
+            .from('user_documents')
+            .select('last_read_page, progress_pct, custom_title')
+            .eq('user_id', currentUser.id)
+            .eq('file_hash', fileHash)
+            .maybeSingle();
+
+        if (existingUserDoc) {
+            if (existingUserDoc.last_read_page && !doc.lastReadPage) {
+                doc.lastReadPage = existingUserDoc.last_read_page;
+                doc.progressPct = existingUserDoc.progress_pct || 0;
+            }
+            if (existingUserDoc.custom_title && !isSuspiciousTitle(existingUserDoc.custom_title)) {
+                doc.title = existingUserDoc.custom_title;
+                renderReaderTabs();
+                renderHubDocuments();
+            }
+        } else {
+            const finalTitle = !isSuspiciousTitle(doc.title) ? doc.title : (doc.fullTitle ? doc.fullTitle.replace(/\.pdf$/i, '') : 'Research Paper');
+            await sb.from('user_documents').insert({
+                user_id: currentUser.id,
+                file_hash: fileHash,
+                custom_title: finalTitle,
+                last_read_page: doc.lastReadPage || 1,
+                progress_pct: doc.progressPct || 0,
+                last_opened_at: new Date().toISOString()
+            });
+        }
+    } catch (err) {
+        console.warn('syncUserDocumentToCloud error:', err);
+    }
+}
+
+async function resolveDocumentPrebake(doc) {
+    if (!doc) return;
+
     const pill = document.getElementById('paper-context-pill');
     const dot = document.getElementById('context-status-dot');
     const label = document.getElementById('context-status-label');
-    
+
     if (pill) {
         pill.classList.remove('hidden');
         pill.classList.add('flex');
     }
+
+    // If prebake already attached to this document object in memory:
+    if (doc.prebakeContext) {
+        window.READIT_SYSTEM.paperContext = doc.prebakeContext;
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-readitGreen shrink-0';
+        if (label) label.textContent = 'Context: Ready';
+        return;
+    }
+
+    if (doc.isResolvingPrebake) return;
+    doc.isResolvingPrebake = true;
+
     if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0';
-    if (label) label.textContent = 'Context: Indexing...';
+    if (label) label.textContent = 'Context: Checking cache...';
+
+    const file = doc.file;
+    let fileHash = doc.fileHash;
+    if (!fileHash && file) {
+        fileHash = await computeFileSha256(file);
+        doc.fileHash = fileHash;
+    }
+
+    const sb = getSupabase();
+
+    // 1. Check Supabase database first for existing prebake!
+    if (sb && fileHash) {
+        try {
+            const { data, error } = await sb
+                .from('documents')
+                .select('file_hash, title, authors, doi, page_count, prebake_context, storage_path')
+                .eq('file_hash', fileHash)
+                .maybeSingle();
+
+            if (!error && data && data.prebake_context) {
+                console.log('⚡ Found existing prebake in Supabase for hash:', fileHash);
+                window.READIT_SYSTEM.paperContext = data.prebake_context;
+                doc.prebakeContext = data.prebake_context;
+
+                const prebakeTitle = (data.prebake_context && data.prebake_context.title) || '';
+                let effectiveTitle = data.title || '';
+                if (isSuspiciousTitle(effectiveTitle) && prebakeTitle && !isSuspiciousTitle(prebakeTitle)) {
+                    effectiveTitle = prebakeTitle;
+                }
+                if (effectiveTitle && !isSuspiciousTitle(effectiveTitle)) {
+                    doc.title = effectiveTitle;
+                    renderReaderTabs();
+                    renderHubDocuments();
+                }
+
+                if (dot) dot.className = 'w-2 h-2 rounded-full bg-readitGreen shrink-0';
+                if (label) {
+                    label.textContent = 'Context: Ready (Cached)';
+                    if (pill) {
+                        const ctx = data.prebake_context;
+                        pill.title = `Domain: ${ctx.domain || 'N/A'}\nCore Problem: ${ctx.core_problem || 'N/A'}\nMethod: ${ctx.core_method || 'N/A'}`;
+                    }
+                }
+
+                if (isLoggedIn && currentUser) {
+                    await syncUserDocumentToCloud(doc, fileHash, data.storage_path);
+                }
+                doc.isResolvingPrebake = false;
+                return;
+            }
+        } catch (sbErr) {
+            console.warn('Supabase cache check warning:', sbErr);
+        }
+    }
+
+    // 2. Not in Supabase cache — Send to backend pdf_parser + LLM prebake
+    if (label) label.textContent = 'Context: Parsing PDF...';
+    if (!file) {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-white/40 shrink-0';
+        if (label) label.textContent = 'Context: Local';
+        doc.isResolvingPrebake = false;
+        return;
+    }
 
     try {
-        let extractedText = '';
-        const maxPagesToRead = Math.min(pdfDoc.numPages, 4);
-        for (let i = 1; i <= maxPagesToRead; i++) {
-            const page = await pdfDoc.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = content.items.map(item => item.str).join(' ');
-            extractedText += `\n--- Page ${i} ---\n` + pageText;
-            if (extractedText.length > 12000) break;
-        }
+        const formData = new FormData();
+        formData.append('file', file);
 
-        const activeTab = openTabs.find(t => t.id === activeTabId);
-        const tabTitle = activeTab ? activeTab.title : '';
-
-        const resp = await fetch('/api/context/prebake', {
+        const resp = await fetch('/api/documents/parse', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: tabTitle,
-                content: extractedText.slice(0, 12000)
-            })
+            body: formData
         });
 
-        if (resp.ok) {
-            const ctx = await resp.json();
-            window.READIT_SYSTEM.paperContext = ctx;
+        if (!resp.ok) {
+            throw new Error(`Parse failed HTTP ${resp.status}`);
+        }
+
+        const parsedData = await resp.json();
+        console.log('✅ PDF parsed via pdf_parser:', parsedData);
+
+        if (parsedData.file_hash && !doc.fileHash) {
+            doc.fileHash = parsedData.file_hash;
+        }
+
+        const prebake = parsedData.prebake_context;
+        if (prebake) {
+            window.READIT_SYSTEM.paperContext = prebake;
+            doc.prebakeContext = prebake;
             if (dot) dot.className = 'w-2 h-2 rounded-full bg-readitGreen shrink-0';
             if (label) {
                 label.textContent = 'Context: Ready';
                 if (pill) {
-                    pill.title = `Domain: ${ctx.domain || 'N/A'}\nCore Problem: ${ctx.core_problem || 'N/A'}\nMethod: ${ctx.core_method || 'N/A'}`;
+                    pill.title = `Domain: ${prebake.domain || 'N/A'}\nCore Problem: ${prebake.core_problem || 'N/A'}\nMethod: ${prebake.core_method || 'N/A'}`;
                 }
             }
         }
-    } catch (e) {
-        console.warn('Paper context prebake failed, fallback active:', e);
+
+        const prebakeTitle = (prebake && prebake.title) || '';
+        let effectiveTitle = parsedData.title || '';
+        if (isSuspiciousTitle(effectiveTitle) && prebakeTitle && !isSuspiciousTitle(prebakeTitle)) {
+            effectiveTitle = prebakeTitle;
+        } else if (isSuspiciousTitle(effectiveTitle) && doc.fullTitle) {
+            effectiveTitle = doc.fullTitle.replace(/\.pdf$/i, '');
+        }
+
+        if (effectiveTitle && !isSuspiciousTitle(effectiveTitle)) {
+            doc.title = effectiveTitle;
+            renderReaderTabs();
+            renderHubDocuments();
+        }
+
+        // 3. If logged in, upload PDF to Supabase Storage and cache prebake in Supabase DB
+        if (isLoggedIn && currentUser && sb) {
+            await saveNewDocumentToCloud(doc, file, parsedData);
+        }
+    } catch (parseErr) {
+        console.warn('pdf_parser prebake failed, fallback active:', parseErr);
         if (dot) dot.className = 'w-2 h-2 rounded-full bg-white/40 shrink-0';
         if (label) label.textContent = 'Context: Local';
+    } finally {
+        doc.isResolvingPrebake = false;
     }
 }
+
+// Backwards compatibility alias
+const prebakePaperContext = resolveDocumentPrebake;
 
 async function loadPdfDocument(urlOrData) {
     try {
         const loadingTask = pdfjsLib.getDocument(urlOrData);
         currentPdf = await loadingTask.promise;
         totalPages = currentPdf.numPages;
-        currentPageNum = 1;
 
         const activeTab = openTabs.find(t => t.id === activeTabId);
         if (activeTab) {
             activeTab.pageCount = totalPages;
+            // Restore last read page if available
+            if (activeTab.lastReadPage && activeTab.lastReadPage >= 1 && activeTab.lastReadPage <= totalPages) {
+                currentPageNum = activeTab.lastReadPage;
+            } else {
+                currentPageNum = 1;
+            }
             renderReaderTabs();
+        } else {
+            currentPageNum = 1;
         }
 
         const pageNav = document.getElementById('page-nav');
@@ -1354,8 +1788,10 @@ async function loadPdfDocument(urlOrData) {
         const pageContainer = document.getElementById('pdf-page-container');
         if (pageContainer) pageContainer.classList.remove('hidden');
 
-        // Background context indexing
-        prebakePaperContext(currentPdf);
+        // Resolve prebake context from Supabase cache or backend pdf_parser
+        if (activeTab) {
+            resolveDocumentPrebake(activeTab);
+        }
 
         await renderPage(currentPageNum);
     } catch (err) {
@@ -2289,6 +2725,7 @@ function escapeHtml(str) {
 // MOBILE BOTTOM EXPLANATION DRAWER & BUMP ANIMATION CONTROLLER
 // =====================================================================
 function triggerExplanationBump(feature) {
+    if (window.innerWidth >= 1024) return;
     const isID = window.READIT_SYSTEM.currentLang === 'id';
     const peek = document.getElementById('bottom-explanation-peek');
     const peekBtn = document.getElementById('peek-capsule-btn');
@@ -2343,6 +2780,7 @@ function triggerExplanationBump(feature) {
 }
 
 function openExplanationBottomDrawer() {
+    if (window.innerWidth >= 1024) return;
     const drawer = document.getElementById('bottom-explanation-drawer');
     const backdrop = document.getElementById('bottom-explanation-backdrop');
     const peek = document.getElementById('bottom-explanation-peek');
@@ -2376,8 +2814,8 @@ function closeExplanationBottomDrawer() {
         }, 300);
     }
 
-    // If an active explanation card exists, restore peek capsule so user can easily re-open
-    if (window.READIT_SYSTEM.activeCard && window.READIT_SYSTEM.activeCardData) {
+    // If an active explanation card exists, restore peek capsule so user can easily re-open (mobile only)
+    if (window.READIT_SYSTEM.activeCard && window.READIT_SYSTEM.activeCardData && window.innerWidth < 1024) {
         if (peek) {
             peek.classList.remove('hidden');
             peek.classList.remove('animate-explanation-bump');
@@ -3045,8 +3483,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('mouseup', handleSelectionChange);
 });
 
-// Debounced window resize handler for PDF Canvas
+// Debounced window resize handler for PDF Canvas & Responsive UI State
 window.addEventListener('resize', () => {
+    if (window.innerWidth >= 1024) {
+        closeExplanationBottomDrawer();
+        dismissExplanationPeek();
+    }
     if (!currentPdf) return;
     clearTimeout(resizeDebounceTimer);
     resizeDebounceTimer = setTimeout(() => {
@@ -3161,5 +3603,10 @@ window.setDrawerSnapState = setDrawerSnapState;
 window.toggleDrawerSnapSize = toggleDrawerSnapSize;
 window.triggerPaperPageTurn = triggerPaperPageTurn;
 window.setupPaperSlideGestures = setupPaperSlideGestures;
+window.resolveDocumentPrebake = resolveDocumentPrebake;
+window.saveNewDocumentToCloud = saveNewDocumentToCloud;
+window.syncUserDocumentToCloud = syncUserDocumentToCloud;
+window.loadUserLibraryFromSupabase = loadUserLibraryFromSupabase;
+window.computeFileSha256 = computeFileSha256;
 
 

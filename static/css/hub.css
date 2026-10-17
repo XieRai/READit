@@ -527,4 +527,22 @@ body {
     animation: paperSlideDownEnter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* =====================================================================
+   RESTRICT BOTTOM EXPLANATION BUMP & DRAWER TO MOBILE VIEWPORTS ONLY
+   On desktop (>= 1024px), explanations are rendered in the dedicated
+   side companion inspector (#sentence-inspector). The bottom notification
+   peek capsule, backdrop, and drawer are strictly suppressed.
+   ===================================================================== */
+@media (min-width: 1024px) {
+    #bottom-explanation-peek,
+    #bottom-explanation-backdrop,
+    #bottom-explanation-drawer {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
+
+
 
