@@ -5,3 +5,4 @@ __pycache__/
 cloudflared.exe
 *.zip
 mcp_config.json
+scratch/
