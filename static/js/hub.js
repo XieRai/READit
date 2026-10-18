@@ -289,6 +289,14 @@ function toggleAccountMenu() {
         if (isAccountDrawerOpen) {
             drawer.classList.add('open');
             if (chevron) chevron.style.transform = 'rotate(180deg)';
+            if (window.innerWidth < 768) {
+                setTimeout(() => {
+                    const sidebar = document.getElementById('hub-sidebar');
+                    if (sidebar) {
+                        sidebar.scrollTo({ top: sidebar.scrollHeight, behavior: 'smooth' });
+                    }
+                }, 100);
+            }
         } else {
             drawer.classList.remove('open');
             if (chevron) chevron.style.transform = 'rotate(0deg)';
@@ -2066,11 +2074,6 @@ async function resolveDocumentPrebake(doc) {
     const dot = document.getElementById('context-status-dot');
     const label = document.getElementById('context-status-label');
 
-    if (pill) {
-        pill.classList.remove('hidden');
-        pill.classList.add('flex');
-    }
-
     // If prebake already attached to this document object in memory:
     if (doc.prebakeContext) {
         window.READIT_SYSTEM.paperContext = doc.prebakeContext;
@@ -2343,6 +2346,10 @@ async function renderPage(pageNum) {
         textLayerDiv.style.width = widthPx + 'px';
         textLayerDiv.style.height = heightPx + 'px';
         textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+        textLayerDiv.setAttribute('tabindex', '-1');
+        textLayerDiv.setAttribute('role', 'region');
+        textLayerDiv.setAttribute('aria-label', 'PDF Document Text');
+        textLayerDiv.setAttribute('translate', 'no');
 
         const textContent = await page.getTextContent();
         currentTextLayerTask = pdfjsLib.renderTextLayer({
@@ -2440,11 +2447,17 @@ function positionFloatingActions(hasCitations) {
     const barWidth = bar.offsetWidth || (hasCitations ? 260 : 180);
     const barHeight = bar.offsetHeight || 36;
 
-    let top = rect.top - barHeight - 8;
+    // Position buttons BELOW the selected text.
+    // On mobile Android/iOS, the browser's native text selection toolbar (Copy, Share, Web Search)
+    // hovers directly ABOVE the selected text.
+    // Placing our buttons BELOW the selection with clearance (approx 20px for Android selection teardrops)
+    // prevents the native toolbar from covering our action buttons!
+    let top = rect.bottom + 20;
     let left = rect.left + (rect.width / 2) - (barWidth / 2);
 
-    if (top < 60) {
-        top = rect.bottom + 8;
+    // If placing below exceeds the screen bottom, fallback to above
+    if (top + barHeight > window.innerHeight - 60) {
+        top = Math.max(60, rect.top - barHeight - 16);
     }
     left = Math.max(12, Math.min(window.innerWidth - barWidth - 12, left));
 
@@ -3572,29 +3585,29 @@ function triggerExplanationBump(feature) {
     let icon = '⚡';
     let title = isID ? 'Ide Inti Siap' : 'Core Idea Ready';
     let dotColor = 'bg-readitGreen';
-    let borderClass = 'border-readitGreen/40 hover:border-readitGreen shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(74,222,128,0.25)]';
+    let borderClass = 'border-readitGreen/40 hover:border-readitGreen shadow-[0_-8px_24px_rgba(0,0,0,0.85)]';
 
     if (feature === 'quick_reference') {
         icon = '🔍';
         title = isID ? 'Rujukan Cepat Siap' : 'Quick Ref Ready';
         dotColor = 'bg-amber-400';
-        borderClass = 'border-amber-400/40 hover:border-amber-400 shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(251,191,36,0.25)]';
+        borderClass = 'border-amber-400/40 hover:border-amber-400 shadow-[0_-8px_24px_rgba(0,0,0,0.85)]';
     } else if (feature === 'easy_citation') {
         icon = '📚';
         title = isID ? 'Sitasi Mudah Siap' : 'Easy Citation Ready';
         dotColor = 'bg-sky-400';
-        borderClass = 'border-sky-400/40 hover:border-sky-400 shadow-[0_12px_36px_rgba(0,0,0,0.85),0_0_20px_rgba(56,189,248,0.25)]';
+        borderClass = 'border-sky-400/40 hover:border-sky-400 shadow-[0_-8px_24px_rgba(0,0,0,0.85)]';
     }
 
     if (iconEl) iconEl.textContent = icon;
     if (labelEl) labelEl.textContent = title;
     if (actionLabel) actionLabel.textContent = isID ? 'Ketuk buka' : 'Tap to open';
 
-    if (pulseDot) pulseDot.className = `absolute w-3 h-3 rounded-full ${dotColor} animate-ping opacity-75`;
+    if (pulseDot) pulseDot.className = `absolute w-2.5 h-2.5 rounded-full ${dotColor} animate-ping opacity-75`;
     if (solidDot) solidDot.className = `relative w-2 h-2 rounded-full ${dotColor}`;
 
     if (peekBtn) {
-        peekBtn.className = `flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#1A1A1A]/95 backdrop-blur-xl border ${borderClass} text-white cursor-pointer select-none group transition-all active:scale-95 touch-manipulation min-h-[44px]`;
+        peekBtn.className = `w-full bg-[#181818]/98 backdrop-blur-2xl border-t border-x-0 border-b-0 ${borderClass} text-white cursor-pointer select-none flex items-center justify-between px-4 py-2 min-h-[44px] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] active:brightness-110 touch-manipulation group transition-all`;
     }
 
     // Trigger bump animation from bottom (spring physics)
@@ -3609,18 +3622,27 @@ function openExplanationBottomDrawer() {
     const drawer = document.getElementById('bottom-explanation-drawer');
     const backdrop = document.getElementById('bottom-explanation-backdrop');
     const peek = document.getElementById('bottom-explanation-peek');
+    const sheet = document.getElementById('bottom-drawer-sheet');
 
     if (peek) peek.classList.add('hidden');
     if (backdrop) {
         backdrop.classList.remove('hidden');
         void backdrop.offsetWidth;
         backdrop.classList.add('backdrop-active');
+        backdrop.style.opacity = '';
     }
     if (drawer) {
         drawer.classList.add('drawer-open');
     }
 
-    setDrawerSnapState(currentDrawerSnap || 'medium');
+    if (sheet) {
+        // Natural default height if not already customized by user drag
+        if (!sheet.style.height || sheet.style.height === '0px') {
+            sheet.style.height = '62vh';
+        }
+        sheet.classList.remove('drawer-snap-small', 'drawer-snap-medium', 'drawer-snap-full');
+    }
+
     syncBottomDrawerTabs(window.READIT_SYSTEM.activeFeature || 'translating_idea');
 }
 
@@ -3695,12 +3717,21 @@ function copyBottomDrawerContent() {
     const text = window.READIT_SYSTEM.copyPayloads[feature];
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
-        const label = document.getElementById('copy-bottom-drawer-label');
-        if (label) {
-            const original = label.textContent;
-            label.textContent = 'Copied!';
-            setTimeout(() => { label.textContent = original; }, 1500);
+        const copyBtn = document.getElementById('btn-copy-bottom-drawer');
+        if (copyBtn) {
+            const originalHtml = copyBtn.innerHTML;
+            copyBtn.innerHTML = `
+                <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            `;
+            copyBtn.classList.add('bg-emerald-500/20');
+            setTimeout(() => {
+                copyBtn.innerHTML = originalHtml;
+                copyBtn.classList.remove('bg-emerald-500/20');
+            }, 1500);
         }
+        showHubToast('Copied breakdown to clipboard');
     });
 }
 
@@ -3918,6 +3949,8 @@ function renderBottomDrawerContent(feature, result) {
 
 let isDraggingDrawer = false;
 let drawerDragStartY = 0;
+let drawerDragLastY = 0;
+let drawerDragStartTime = 0;
 let drawerInitialHeight = 0;
 let currentDrawerSnap = 'medium'; // 'small' | 'medium' | 'full'
 
@@ -3957,19 +3990,38 @@ function setupDrawerTouchGestures() {
     const onDragStart = (clientY) => {
         isDraggingDrawer = true;
         drawerDragStartY = clientY;
+        drawerDragLastY = clientY;
+        drawerDragStartTime = Date.now();
         drawerInitialHeight = sheet.getBoundingClientRect().height;
+        sheet.classList.remove('drawer-snap-small', 'drawer-snap-medium', 'drawer-snap-full');
         sheet.style.transition = 'none';
     };
 
     const onDragMove = (clientY) => {
         if (!isDraggingDrawer) return;
-        const deltaY = drawerDragStartY - clientY; // dragging up = positive
-        const newHeight = Math.max(100, Math.min(window.innerHeight * 0.96, drawerInitialHeight + deltaY));
-        sheet.style.height = `${newHeight}px`;
+        drawerDragLastY = clientY;
+        const deltaY = drawerDragStartY - clientY; // dragging up = positive height growth
+        const targetHeight = drawerInitialHeight + deltaY;
+        const vh = window.innerHeight;
+        const maxHeight = vh * 0.95;
+
+        let newHeight = targetHeight;
+        if (targetHeight > maxHeight) {
+            // Smooth resistance if dragged above 95% screen height
+            newHeight = maxHeight + (targetHeight - maxHeight) * 0.22;
+        } else if (targetHeight < 120) {
+            newHeight = Math.max(60, targetHeight);
+        }
+
+        sheet.style.height = `${Math.round(newHeight)}px`;
 
         const backdrop = document.getElementById('bottom-explanation-backdrop');
-        if (backdrop && newHeight < 200) {
-            backdrop.style.opacity = String(Math.max(0.1, newHeight / 200));
+        if (backdrop) {
+            if (newHeight < 220) {
+                backdrop.style.opacity = String(Math.max(0.08, newHeight / 220));
+            } else {
+                backdrop.style.opacity = '';
+            }
         }
     };
 
@@ -3977,27 +4029,36 @@ function setupDrawerTouchGestures() {
         if (!isDraggingDrawer) return;
         isDraggingDrawer = false;
 
-        sheet.style.transition = 'height 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)';
-        const finalHeight = sheet.getBoundingClientRect().height;
         const vh = window.innerHeight;
+        const finalHeight = sheet.getBoundingClientRect().height;
+        const dragDuration = Math.max(1, Date.now() - drawerDragStartTime);
+        const dragDistanceY = drawerDragLastY - drawerDragStartY; // positive = dragged downward
+        const downwardVelocity = dragDistanceY / dragDuration; // px/ms
 
         const backdrop = document.getElementById('bottom-explanation-backdrop');
         if (backdrop) backdrop.style.opacity = '';
 
-        if (finalHeight <= vh * 0.22) {
+        const dismissThreshold = Math.min(220, vh * 0.24);
+        const isQuickFlickDown = downwardVelocity > 0.45 && finalHeight < vh * 0.55;
+
+        if (finalHeight <= dismissThreshold || isQuickFlickDown) {
+            sheet.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
             closeExplanationBottomDrawer();
-        } else if (finalHeight >= vh * 0.74) {
-            setDrawerSnapState('full');
-        } else if (finalHeight <= vh * 0.48) {
-            setDrawerSnapState('small');
         } else {
-            setDrawerSnapState('medium');
+            // Keep the exact height chosen by the user (free sizing)
+            const clampedHeight = Math.max(160, Math.min(Math.round(vh * 0.95), Math.round(finalHeight)));
+            sheet.style.transition = 'height 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+            sheet.style.height = `${clampedHeight}px`;
         }
+    };
+
+    const shouldIgnoreDrag = (target) => {
+        return !!target.closest('button, a, input, [role="button"], #bottom-drawer-content');
     };
 
     // Mobile Touch Drag
     header.addEventListener('touchstart', (e) => {
-        if (e.target.closest('button, #bottom-drawer-content, input')) return;
+        if (shouldIgnoreDrag(e.target)) return;
         if (e.touches && e.touches[0]) {
             onDragStart(e.touches[0].clientY);
         }
@@ -4010,10 +4071,11 @@ function setupDrawerTouchGestures() {
     }, { passive: true });
 
     window.addEventListener('touchend', onDragEnd, { passive: true });
+    window.addEventListener('touchcancel', onDragEnd, { passive: true });
 
     // Desktop Pointer Drag
     header.addEventListener('pointerdown', (e) => {
-        if (e.target.closest('button, #bottom-drawer-content, input')) return;
+        if (shouldIgnoreDrag(e.target)) return;
         onDragStart(e.clientY);
     });
 
@@ -4024,6 +4086,7 @@ function setupDrawerTouchGestures() {
     });
 
     window.addEventListener('pointerup', onDragEnd);
+    window.addEventListener('pointercancel', onDragEnd);
 }
 
 // =====================================================================

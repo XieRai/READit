@@ -19,6 +19,7 @@ function initTheme() {
     }
     updateThemeUI();
     renderPdfShowcaseState();
+    updateSlidingGreenBlock();
 }
 
 function toggleTheme() {
@@ -236,16 +237,58 @@ function updateSlidingGreenBlock() {
     const slider = document.getElementById('sliding-green-block');
     if (!container || !activeCard || !slider) return;
 
-    const offsetTop = activeCard.offsetTop;
-    const height = activeCard.offsetHeight;
-    slider.style.transform = `translateY(${offsetTop}px)`;
-    slider.style.height = `${height}px`;
+    const isHorizontal = window.innerWidth < 1024;
+    let offsetLeft = 0;
+    let offsetTop = 0;
+    let width = 0;
+    let height = 0;
+
+    if (isHorizontal) {
+        offsetLeft = activeCard.offsetLeft;
+        offsetTop = activeCard.offsetTop;
+        width = activeCard.offsetWidth;
+        height = activeCard.offsetHeight;
+
+        // Fallback to getBoundingClientRect if offsetLeft is 0 when active index > 0
+        if (offsetLeft === 0 && activeFeatureIndex > 0) {
+            const cRect = container.getBoundingClientRect();
+            const aRect = activeCard.getBoundingClientRect();
+            offsetLeft = aRect.left - cRect.left;
+            offsetTop = aRect.top - cRect.top;
+            width = aRect.width;
+            height = aRect.height;
+        }
+
+        if (width > 0 && height > 0) {
+            slider.style.transform = `translate3d(${offsetLeft}px, ${offsetTop}px, 0)`;
+            slider.style.width = `${width}px`;
+            slider.style.height = `${height}px`;
+            slider.style.opacity = '1';
+        }
+    } else {
+        offsetTop = activeCard.offsetTop;
+        height = activeCard.offsetHeight;
+        if (height > 0) {
+            slider.style.transform = `translate3d(0, ${offsetTop}px, 0)`;
+            slider.style.width = '100%';
+            slider.style.height = `${height}px`;
+            slider.style.opacity = '1';
+        }
+    }
 }
 
 window.addEventListener('resize', updateSlidingGreenBlock);
-window.addEventListener('load', () => {
-    setTimeout(updateSlidingGreenBlock, 60);
+window.addEventListener('orientationchange', () => {
+    setTimeout(updateSlidingGreenBlock, 80);
 });
+window.addEventListener('load', () => {
+    updateSlidingGreenBlock();
+    setTimeout(updateSlidingGreenBlock, 50);
+    setTimeout(updateSlidingGreenBlock, 250);
+});
+if (document.fonts) {
+    document.fonts.ready.then(updateSlidingGreenBlock);
+}
 
 function selectFeature(index) {
     activeFeatureIndex = index;
@@ -254,6 +297,8 @@ function selectFeature(index) {
 
     updateSlidingGreenBlock();
     renderPdfShowcaseState();
+    requestAnimationFrame(updateSlidingGreenBlock);
+    setTimeout(updateSlidingGreenBlock, 40);
 
     setTimeout(() => {
         const scrollContainer = document.getElementById('pdf-scroll-container');
@@ -328,30 +373,24 @@ function renderPdfShowcaseState() {
         const desc = document.getElementById(`desc-feat-${i}`);
         const title = document.getElementById(`title-feat-${i}`);
 
+        if (badge) badge.style.display = 'none';
+
         if (card) {
             if (i === activeFeatureIndex) {
-                card.className = "relative z-10 w-full text-left p-4 sm:p-6 lg:p-7 rounded-[18px] sm:rounded-[24px] transition-all duration-300 focus:outline-none group border border-transparent";
+                card.className = "relative z-10 w-full flex flex-col items-center justify-center lg:items-start lg:justify-start py-2.5 px-1.5 sm:py-3 sm:px-3 lg:p-7 rounded-xl sm:rounded-2xl lg:rounded-[24px] transition-all duration-300 focus:outline-none group border border-transparent min-h-[52px] lg:min-h-0";
                 if (title) {
-                    title.className = "font-monoFeature font-bold text-sm sm:text-lg lg:text-xl tracking-[0.06em] uppercase text-white transition-colors";
-                }
-                if (badge) {
-                    badge.textContent = currentPaperMode === 'after' ? "● Active" : "○ Original";
-                    badge.className = "text-[10px] sm:text-[11px] font-monoFeature uppercase tracking-wider text-white/90";
+                    title.className = "w-full font-monoFeature font-bold text-[10px] min-[370px]:text-[11px] sm:text-xs lg:text-xl tracking-tight sm:tracking-normal lg:tracking-[0.06em] uppercase text-center lg:text-left text-white transition-colors leading-[1.25] break-words";
                 }
                 if (desc) {
-                    desc.className = "hidden sm:block font-sans text-sm sm:text-[15px] leading-relaxed text-white/90 mt-1 sm:mt-0";
+                    desc.className = "hidden lg:block font-sans text-sm sm:text-[15px] leading-relaxed text-white/90 mt-2";
                 }
             } else {
-                card.className = "relative z-10 w-full text-left p-4 sm:p-6 lg:p-7 rounded-[18px] sm:rounded-[24px] transition-all duration-300 focus:outline-none group border border-neutral-200 dark:border-white/[0.08] hover:border-neutral-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.015] shadow-sm dark:shadow-none";
+                card.className = "relative z-10 w-full flex flex-col items-center justify-center lg:items-start lg:justify-start py-2.5 px-1.5 sm:py-3 sm:px-3 lg:p-7 rounded-xl sm:rounded-2xl lg:rounded-[24px] transition-all duration-300 focus:outline-none group border border-neutral-200 dark:border-white/[0.08] hover:border-neutral-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.015] shadow-sm dark:shadow-none min-h-[52px] lg:min-h-0";
                 if (title) {
-                    title.className = "font-monoFeature font-bold text-sm sm:text-lg lg:text-xl tracking-[0.06em] uppercase text-neutral-900 dark:text-neutral-200 group-hover:text-black dark:group-hover:text-white transition-colors";
-                }
-                if (badge) {
-                    badge.textContent = "Select →";
-                    badge.className = "text-[10px] sm:text-[11px] font-monoFeature uppercase tracking-wider text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-200 transition";
+                    title.className = "w-full font-monoFeature font-bold text-[10px] min-[370px]:text-[11px] sm:text-xs lg:text-xl tracking-tight sm:tracking-normal lg:tracking-[0.06em] uppercase text-center lg:text-left text-neutral-800 dark:text-neutral-300 group-hover:text-black dark:group-hover:text-white transition-colors leading-[1.25] break-words";
                 }
                 if (desc) {
-                    desc.className = "hidden sm:block font-sans text-sm sm:text-[15px] leading-relaxed text-neutral-700 dark:text-[#8A9994] group-hover:text-neutral-950 dark:group-hover:text-neutral-200 transition-colors mt-1 sm:mt-0";
+                    desc.className = "hidden lg:block font-sans text-sm sm:text-[15px] leading-relaxed text-neutral-700 dark:text-[#8A9994] group-hover:text-neutral-950 dark:group-hover:text-neutral-200 transition-colors mt-2";
                 }
             }
         }
@@ -644,7 +683,7 @@ const modalData = {
         badge: "App",
         title: "Install & Launch READit",
         actionText: "Open Document Hub →",
-        actionHref: "/hub",
+        actionHref: "javascript:void(0)",
         html: `
             <div class="space-y-4">
                 <p>READit is engineered as a modern, zero-install Web Application and Progressive Web App (PWA). You don't need heavy installers or desktop background services to read and synthesize dense PDFs.</p>
@@ -665,7 +704,7 @@ const modalData = {
         badge: "Pricing",
         title: "Academic Beta Pricing",
         actionText: "Get Started Free →",
-        actionHref: "/hub",
+        actionHref: "javascript:void(0)",
         html: `
             <div class="space-y-4">
                 <div class="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20">

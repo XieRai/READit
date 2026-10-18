@@ -2,13 +2,23 @@
 /* READit SaaS Landing Page Stylesheet (Light & Dark Theme)              */
 /* ===================================================================== */
 
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
 }
 body {
     background-color: #F8FAF9;
     color: #0F172A;
     overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
     font-family: 'Inter', sans-serif;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -170,6 +180,9 @@ html.dark .doc-line-group:hover .skeleton-bar {
 .academic-paper-sheet {
     background-color: #FFFFFF;
     color: #111827;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
     box-shadow: 
         0 24px 60px rgba(0, 0, 0, 0.18),
         0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -237,7 +250,13 @@ html.dark .academic-paper-sheet {
     box-shadow: 
         0 24px 54px -12px rgba(46, 229, 125, 0.32),
         inset 0 1px 1.5px rgba(255, 255, 255, 0.35);
-    transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), width 0.38s cubic-bezier(0.22, 1, 0.36, 1), height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, width, height;
+}
+
+/* Ensure badges are strictly hidden if any legacy markup remains */
+#badge-feat-0, #badge-feat-1, #badge-feat-2, [id^="badge-feat-"] {
+    display: none !important;
 }
 
 /* Custom subtle scrollbar for internal PDF Reader scroll */
@@ -316,4 +335,28 @@ html.dark .love-gradient-text {
 }
 .site-header.header-hidden {
     transform: translateY(-100%);
+}
+
+/* ===================================================================== */
+/* MOBILE VIEWPORT OVERFLOW SAFEGUARDS (< 640px)                         */
+/* ===================================================================== */
+@media (max-width: 639px) {
+    .document-glass-card {
+        transform: rotate(2deg);
+        max-width: calc(100vw - 2.5rem);
+    }
+    .document-glass-card:hover {
+        transform: rotate(1deg) translateY(-2px);
+    }
+    .popover-glass-card {
+        transform: rotate(1.5deg);
+        max-width: calc(100vw - 4rem);
+    }
+    .popover-glass-card:hover {
+        transform: rotate(0.5deg) scale(1.02);
+    }
+    .parallax-emerald-glow {
+        max-width: 85vw;
+        max-height: 85vw;
+    }
 }
