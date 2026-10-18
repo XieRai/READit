@@ -27,8 +27,8 @@ let isLoggingOut = false;
 
 function getSupabase() {
     if (supabaseClient) return supabaseClient;
-    const url = (window.ENV && window.ENV.SUPABASE_URL) || 'https://ecnbupsjpwesvokwszpe.supabase.co';
-    const key = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbmJ1cHNqcHdlc3Zva3dzenBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMzc4MDksImV4cCI6MjEwNzcxMzgwOX0.IwOoWQq4M78LXNd7OuuHFydf0xnz75N4SpDSqYVxAuo';
+    const url = (window.ENV && window.ENV.SUPABASE_URL) || '';
+    const key = (window.ENV && window.ENV.SUPABASE_ANON_KEY) || '';
     if (window.supabase && url && key) {
         supabaseClient = window.supabase.createClient(url, key);
     }
@@ -454,7 +454,7 @@ function triggerPendingUploadsIfAny() {
 }
 
 function initGoogleIdentity() {
-    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '922432658863-m5a3o71dpsj4p45k1n359fptgh89j31p.apps.googleusercontent.com';
+    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '';
     if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
     try {
         window.google.accounts.id.initialize({

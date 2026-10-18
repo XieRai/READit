@@ -4,5 +4,7 @@ __pycache__/
 *.db
 cloudflared.exe
 *.zip
+*.bat
 mcp_config.json
 scratch/
+.agents/
