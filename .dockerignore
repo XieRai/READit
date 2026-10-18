@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+venv/
+.agents/
+scratch/
+cloudflared.exe
+*.zip
+*.bat
+mcp_config.json
+.dockerignore
