@@ -23,6 +23,7 @@ let isSidebarMinimized = false;
 let pendingUploadFiles = [];
 let dragCounter = 0;
 let supabaseClient = null;
+let isLoggingOut = false;
 
 function getSupabase() {
     if (supabaseClient) return supabaseClient;
@@ -34,13 +35,24 @@ function getSupabase() {
     return supabaseClient;
 }
 
+function escapeHtml(str) {
+    if (typeof str !== 'string') return String(str || '');
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function applySupabaseUser(user) {
     if (!user) return;
     const meta = user.user_metadata || {};
-    const name = meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'Researcher');
+    const name = meta.full_name || meta.name || meta.display_name || (user.email ? user.email.split('@')[0] : 'Researcher');
     currentUser = {
         id: user.id,
-        name: name.charAt(0).toUpperCase() + name.slice(1),
+        name: name,
+        displayName: name,
         email: user.email || '',
         avatarUrl: meta.avatar_url || meta.picture || null,
         plan: 'Free plan'
@@ -48,6 +60,53 @@ function applySupabaseUser(user) {
     isLoggedIn = true;
     localStorage.setItem('readit_user', JSON.stringify(currentUser));
     updateAccountUI();
+    syncUserProfileAndPreferences(user.id);
+    if (typeof loadUserSavedInsightsFromSupabase === 'function') {
+        loadUserSavedInsightsFromSupabase();
+    }
+}
+
+async function syncUserProfileAndPreferences(userId) {
+    if (!userId) return;
+    const sb = getSupabase();
+    if (!sb) return;
+
+    try {
+        const [profileRes, prefRes] = await Promise.all([
+            sb.from('users').select('display_name').eq('id', userId).maybeSingle(),
+            sb.from('user_preferences').select('target_language, reader_theme').eq('user_id', userId).maybeSingle()
+        ]);
+
+        // 1. Sync custom display name from public.users table if present
+        if (profileRes && profileRes.data && profileRes.data.display_name) {
+            const dbDisplayName = profileRes.data.display_name.trim();
+            if (dbDisplayName && currentUser && currentUser.id === userId) {
+                currentUser.name = dbDisplayName;
+                currentUser.displayName = dbDisplayName;
+                localStorage.setItem('readit_user', JSON.stringify(currentUser));
+                updateAccountUI();
+            }
+        }
+
+        // 2. Sync target language preference from public.user_preferences table
+        if (prefRes && prefRes.data && prefRes.data.target_language) {
+            const dbLang = prefRes.data.target_language;
+            if (['en', 'id'].includes(dbLang)) {
+                setReaderLang(dbLang, false); // false = do not trigger echo write back to DB
+            }
+        } else if (currentUser && currentUser.id === userId) {
+            // First time or missing record in user_preferences: upsert defaults
+            const currentPref = localStorage.getItem('readit_target_language') || 'en';
+            await sb.from('user_preferences').upsert({
+                user_id: userId,
+                target_language: currentPref,
+                reader_theme: localStorage.getItem('readit_theme') || 'dark',
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+        }
+    } catch (err) {
+        console.warn('syncUserProfileAndPreferences error:', err);
+    }
 }
 
 function loadFallbackUser() {
@@ -64,9 +123,22 @@ function loadFallbackUser() {
         currentUser = null;
         isLoggedIn = false;
     }
+    if (typeof updateStarButtonsVisibility === 'function') {
+        updateStarButtonsVisibility(isLoggedIn && !!currentUser);
+    }
 }
 
 async function initAccountState() {
+    // Check if we just logged out and should display the confirmation toast
+    try {
+        if (sessionStorage.getItem('readit_logout_toast')) {
+            sessionStorage.removeItem('readit_logout_toast');
+            setTimeout(() => {
+                showHubToast('Signed out of READit');
+            }, 300);
+        }
+    } catch (e) {}
+
     const sb = getSupabase();
     if (sb) {
         try {
@@ -74,8 +146,15 @@ async function initAccountState() {
             if (session && session.user) {
                 applySupabaseUser(session.user);
                 loadUserLibraryFromSupabase();
+                if (typeof loadUserSavedInsightsFromSupabase === 'function') {
+                    loadUserSavedInsightsFromSupabase();
+                }
             } else {
                 loadFallbackUser();
+                await loadDemoPaper();
+                if (typeof updateStarButtonsVisibility === 'function') {
+                    updateStarButtonsVisibility(false);
+                }
             }
 
             sb.auth.onAuthStateChange((event, session) => {
@@ -85,22 +164,44 @@ async function initAccountState() {
                         showHubToast(`Welcome, ${currentUser.name}`);
                         triggerPendingUploadsIfAny();
                         loadUserLibraryFromSupabase();
+                        if (typeof loadUserSavedInsightsFromSupabase === 'function') {
+                            loadUserSavedInsightsFromSupabase();
+                        }
                     }
                 } else if (event === 'SIGNED_OUT') {
+                    const wasLoggedIn = isLoggedIn;
                     currentUser = null;
                     isLoggedIn = false;
+                    userSavedInsights = [];
                     localStorage.removeItem('readit_user');
-                    hubDocuments = hubDocuments.filter(d => !d.isCloudOnly);
-                    renderHubDocuments();
+                    if (typeof updateStarButtonsVisibility === 'function') {
+                        updateStarButtonsVisibility(false);
+                    }
+
+                    // If an active user was signed out and reload hasn't been triggered yet, refresh once
+                    if (wasLoggedIn && !isLoggingOut) {
+                        isLoggingOut = true;
+                        try {
+                            sessionStorage.setItem('readit_logout_toast', 'true');
+                        } catch (e) {}
+                        window.location.reload();
+                        return;
+                    }
+
+                    hubDocuments = [];
+                    openTabs = [];
+                    loadDemoPaper();
                     updateAccountUI();
                 }
             });
         } catch (err) {
             console.warn('Supabase auth init:', err);
             loadFallbackUser();
+            await loadDemoPaper();
         }
     } else {
         loadFallbackUser();
+        await loadDemoPaper();
     }
     updateAccountUI();
 }
@@ -138,6 +239,9 @@ function updateAccountUI() {
             chevron.innerHTML = '<polyline points="18 15 12 9 6 15"></polyline>';
             chevron.style.transform = isAccountDrawerOpen ? 'rotate(180deg)' : 'rotate(0deg)';
         }
+        if (typeof updateStarButtonsVisibility === 'function') {
+            updateStarButtonsVisibility(true);
+        }
     } else {
         if (avatar) {
             avatar.className = "w-7 h-7 rounded-full bg-[#333333] border border-white/10 flex items-center justify-center text-xs text-white/70 font-semibold shrink-0";
@@ -155,6 +259,9 @@ function updateAccountUI() {
         }
         if (drawer) drawer.classList.remove('open');
         isAccountDrawerOpen = false;
+        if (typeof updateStarButtonsVisibility === 'function') {
+            updateStarButtonsVisibility(false);
+        }
     }
 }
 
@@ -545,6 +652,26 @@ async function handleEmailSignUp(event) {
 }
 
 async function handleLogoutAction() {
+    if (isLoggingOut) return;
+    isLoggingOut = true;
+
+    // Immediately clear authentication state and stored user info
+    isLoggedIn = false;
+    currentUser = null;
+    localStorage.removeItem('readit_user');
+
+    // Store a one-shot notification flag in sessionStorage so the toast appears after reload
+    try {
+        sessionStorage.setItem('readit_logout_toast', 'true');
+    } catch (e) {}
+
+    // Clear document state in memory
+    hubDocuments = [];
+    openTabs = [];
+    activeTabId = null;
+    currentPdf = null;
+
+    // Sign out of Supabase to invalidate cloud session & localStorage tokens
     const sb = getSupabase();
     if (sb) {
         try {
@@ -553,13 +680,95 @@ async function handleLogoutAction() {
             console.warn('Sign-out error:', err);
         }
     }
-    isLoggedIn = false;
-    currentUser = null;
-    localStorage.removeItem('readit_user');
-    hubDocuments = hubDocuments.filter(d => !d.isCloudOnly);
-    renderHubDocuments();
-    updateAccountUI();
-    showHubToast('Signed out of READit');
+
+    // Refresh page once so papers and state from previous logged-in account do not appear
+    window.location.reload();
+}
+
+// =====================================================================
+// DEMO PAPER CONFIGURATION (SUPABASE STORAGE & DATABASE CACHE)
+// =====================================================================
+const DEMO_PAPER_CONFIG = {
+    id: 'demo-paper-sample',
+    fileHash: '11bdd54d13587d38b4f611b0113a70e2d8315b0b445e5c134a0aeb81bcf6951c',
+    title: 'AC Series Arc Fault (Demo)',
+    fullTitle: 'Intelligent Identification Method of Low Voltage AC Series Arc Fault Based on Using Residual Model and Rime Optimization Algorithm',
+    authors: ['Xiao He', 'Takahiro Kawaguchi', 'Seiji Hashimoto'],
+    pageCount: 22,
+    storagePath: 'demo/11bdd54d13587d38b4f611b0113a70e2d8315b0b445e5c134a0aeb81bcf6951c.pdf',
+    demoFallbackUrl: '/assets/docs/demo_paper_sample.pdf',
+    isDemo: true,
+    isCloudOnly: true
+};
+
+let demoPaperPromise = null;
+
+async function loadDemoPaper() {
+    if (hubDocuments.some(d => d.id === DEMO_PAPER_CONFIG.id || d.fileHash === DEMO_PAPER_CONFIG.fileHash)) {
+        return;
+    }
+
+    if (demoPaperPromise) {
+        return demoPaperPromise;
+    }
+
+    demoPaperPromise = (async () => {
+        try {
+            if (hubDocuments.some(d => d.id === DEMO_PAPER_CONFIG.id || d.fileHash === DEMO_PAPER_CONFIG.fileHash)) {
+                return;
+            }
+
+            let demoDocData = null;
+            const sb = getSupabase();
+            if (sb) {
+                try {
+                    const { data: rpcData, error: rpcErr } = await sb.rpc('get_demo_document');
+                    if (!rpcErr && rpcData && rpcData.length > 0) {
+                        demoDocData = rpcData[0];
+                    } else {
+                        const { data, error } = await sb
+                            .from('documents')
+                            .select('file_hash, title, authors, doi, page_count, prebake_context, storage_path, is_demo_file')
+                            .eq('is_demo_file', true)
+                            .limit(1);
+
+                        if (!error && data && data.length > 0) {
+                            demoDocData = data[0];
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Could not query demo document from Supabase:', err);
+                }
+            }
+
+            if (hubDocuments.some(d => d.id === DEMO_PAPER_CONFIG.id || d.fileHash === (demoDocData?.file_hash || DEMO_PAPER_CONFIG.fileHash))) {
+                return;
+            }
+
+            const demoDoc = {
+                id: DEMO_PAPER_CONFIG.id,
+                fileHash: demoDocData?.file_hash || DEMO_PAPER_CONFIG.fileHash,
+                title: DEMO_PAPER_CONFIG.title,
+                fullTitle: demoDocData?.title || DEMO_PAPER_CONFIG.fullTitle,
+                authors: demoDocData?.authors || DEMO_PAPER_CONFIG.authors,
+                pageCount: demoDocData?.page_count || DEMO_PAPER_CONFIG.pageCount,
+                lastReadPage: 1,
+                progressPct: 0,
+                storagePath: demoDocData?.storage_path || DEMO_PAPER_CONFIG.storagePath,
+                prebakeContext: demoDocData?.prebake_context || null,
+                isCloudOnly: true,
+                isDemo: true,
+                demoFallbackUrl: DEMO_PAPER_CONFIG.demoFallbackUrl
+            };
+
+            hubDocuments.push(demoDoc);
+            renderHubDocuments();
+        } finally {
+            demoPaperPromise = null;
+        }
+    })();
+
+    return demoPaperPromise;
 }
 
 // =====================================================================
@@ -569,11 +778,20 @@ let hubDocuments = [];
 let openTabs = [];
 let activeTabId = null;
 let isRecentGridExpanded = true;
-let currentReaderLang = 'en';
+let currentReaderLang = localStorage.getItem('readit_target_language') || 'en';
 
 function renderHubDocuments() {
     const listContainer = document.getElementById('hub-dynamic-docs-list');
     if (!listContainer) return;
+
+    // Deduplicate hubDocuments by fileHash or id
+    const seen = new Set();
+    hubDocuments = hubDocuments.filter(d => {
+        const key = d.fileHash || d.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 
     if (hubDocuments.length === 0) {
         listContainer.innerHTML = '';
@@ -581,9 +799,20 @@ function renderHubDocuments() {
     }
 
     listContainer.innerHTML = hubDocuments.map((doc) => `
-        <div class="flex flex-col items-center w-full group cursor-pointer touch-manipulation" onclick="openSmartReader('${doc.id}')">
+        <div class="flex flex-col items-center w-full group cursor-pointer touch-manipulation relative" onclick="openSmartReader('${doc.id}')">
             <!-- Miniature Paper Thumbnail (Aspect 175/225 responsive, touch target >= 44x44px) -->
-            <div class="w-full aspect-[175/225] min-h-[190px] sm:min-h-[225px] rounded-[14px] bg-white p-3 sm:p-3.5 text-[#111827] shadow-md border border-transparent group-hover:ring-2 group-hover:ring-readitGreen active:scale-[0.98] transition-all overflow-hidden flex flex-col justify-between select-none">
+            <div class="w-full aspect-[175/225] min-h-[190px] sm:min-h-[225px] rounded-[14px] bg-white p-3 sm:p-3.5 text-[#111827] shadow-md border border-transparent group-hover:ring-2 group-hover:ring-readitGreen active:scale-[0.98] transition-all overflow-hidden flex flex-col justify-between select-none relative">
+                ${!doc.isDemo ? `
+                    <!-- Delete Document Button -->
+                    <button onclick="event.stopPropagation(); promptDeleteDocument('${doc.id}')"
+                            class="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/75 hover:bg-rose-600 text-white/80 hover:text-white flex items-center justify-center transition-all opacity-90 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus:outline-none z-20 shadow-md backdrop-blur-sm active:scale-90 touch-manipulation"
+                            title="Delete file and associated starred content"
+                            aria-label="Delete document">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                ` : ''}
                 <div>
                     <!-- Miniature Journal Header -->
                     <div class="flex items-start justify-between border-b border-neutral-800 pb-1 sm:pb-1.5 mb-1 sm:mb-1.5">
@@ -591,19 +820,22 @@ function renderHubDocuments() {
                             <div class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-[#0284C7] flex items-center justify-center text-[3.8px] sm:text-[4.5px] font-bold text-[#0284C7]">PDF</div>
                             <div class="text-[4.3px] sm:text-[5px] italic text-[#0284C7] leading-tight font-serifPaper">
                                 <div>Academic Research</div>
-                                <div>Manuscript</div>
+                                <div>${doc.isDemo ? 'Demo Manuscript' : 'Manuscript'}</div>
                             </div>
                         </div>
-                        <div class="text-[3.6px] sm:text-[4.5px] text-neutral-700 leading-tight text-right font-serifPaper">
-                            <div>${doc.pageCount || 1} Pages</div>
-                            <div>READit Hub</div>
+                        <div class="flex flex-col items-end">
+                            ${doc.isDemo ? '<span class="text-[7.5px] font-monoFeature uppercase font-bold text-emerald-700 bg-emerald-100 border border-emerald-400 px-1 py-0.5 rounded leading-none mb-0.5 shadow-xs">Demo</span>' : ''}
+                            <div class="text-[3.6px] sm:text-[4.5px] text-neutral-700 leading-tight text-right font-serifPaper">
+                                <div>${doc.pageCount || 1} Pages</div>
+                                <div>READit Hub</div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Miniature Paper Title -->
-                    <div class="text-[4px] sm:text-[5px] italic text-neutral-600 mb-0.5 font-serifPaper">Research Article</div>
+                    <div class="text-[4px] sm:text-[5px] italic text-neutral-600 mb-0.5 font-serifPaper">${doc.isDemo ? 'Featured Demo Paper' : 'Research Article'}</div>
                     <div class="text-[6.5px] sm:text-[7.5px] font-bold text-black leading-[1.2] mb-1 font-serifPaper line-clamp-2">
-                        ${doc.fullTitle || doc.title}
+                        ${escapeHtml(doc.fullTitle || doc.title)}
                     </div>
 
                     <!-- Miniature Abstract Block -->
@@ -612,17 +844,170 @@ function renderHubDocuments() {
                     </div>
                 </div>
 
-                <div class="border-t border-neutral-800 pt-1 text-[3.8px] sm:text-[4.8px] text-neutral-700 font-serifPaper truncate">
-                    <strong>Format:</strong> PDF • Smart Reader Enabled
+                <div class="border-t border-neutral-800 pt-1 text-[3.8px] sm:text-[4.8px] text-neutral-700 font-serifPaper truncate flex items-center justify-between">
+                    <span><strong>Format:</strong> PDF • Smart Reader</span>
+                    ${doc.isDemo ? '<span class="font-monoFeature font-semibold text-emerald-600">Sample Paper</span>' : ''}
                 </div>
             </div>
 
             <!-- Centered Document Label underneath -->
-            <span class="mt-2.5 text-[11px] sm:text-xs font-semibold text-white tracking-wide w-full max-w-[170px] truncate text-center px-1">
-                ${doc.title}
-            </span>
+            <div class="mt-2.5 flex flex-col items-center w-full px-1">
+                <span class="text-[11px] sm:text-xs font-semibold text-white tracking-wide w-full max-w-[170px] truncate text-center" title="${escapeHtml(doc.fullTitle || doc.title)}">
+                    ${escapeHtml(doc.title)}
+                </span>
+                ${doc.isDemo ? '<span class="text-[9.5px] font-monoFeature font-semibold text-readitGreen uppercase tracking-wider mt-0.5">Demo Paper</span>' : ''}
+            </div>
         </div>
     `).join('');
+}
+
+// =====================================================================
+// DELETE DOCUMENT & ASSOCIATED STARRED INSIGHTS CONTROLLER
+// =====================================================================
+let pendingDeleteDocId = null;
+
+function promptDeleteDocument(docIdentifier) {
+    const doc = hubDocuments.find(d => d.id === docIdentifier || d.fileHash === docIdentifier);
+    if (!doc) return;
+
+    if (doc.isDemo) {
+        showHubToast('Built-in demo paper cannot be deleted');
+        return;
+    }
+
+    pendingDeleteDocId = doc.id;
+
+    const modal = document.getElementById('hub-delete-confirm-modal');
+    const titleEl = document.getElementById('delete-modal-doc-title');
+    const warnText = document.getElementById('delete-modal-warning-text');
+    const confirmBtn = document.getElementById('btn-confirm-delete');
+
+    if (titleEl) {
+        titleEl.textContent = doc.fullTitle || doc.title || 'Research Document';
+    }
+
+    const starredCount = (typeof userSavedInsights !== 'undefined' && Array.isArray(userSavedInsights))
+        ? userSavedInsights.filter(i => (doc.fileHash && i.file_hash === doc.fileHash) || (doc.id && i.file_hash === doc.id)).length
+        : 0;
+
+    if (warnText) {
+        if (starredCount > 0) {
+            warnText.innerHTML = `Deleting this file will permanently remove it from your library and delete all <strong class="underline text-amber-300 font-bold">${starredCount} starred breakdown${starredCount > 1 ? 's' : ''}</strong> associated with this paper from your notebook.`;
+        } else {
+            warnText.textContent = 'Deleting this file will permanently remove it from your cloud library and reading history. Any future bookmarks on this file will be lost.';
+        }
+    }
+
+    if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `<span>Delete File ${starredCount > 0 ? '& Starred' : ''}</span>`;
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeDeleteConfirmModal() {
+    const modal = document.getElementById('hub-delete-confirm-modal');
+    if (modal) modal.classList.add('hidden');
+    pendingDeleteDocId = null;
+}
+
+async function confirmDeleteDocument() {
+    if (!pendingDeleteDocId) return;
+
+    const doc = hubDocuments.find(d => d.id === pendingDeleteDocId);
+    if (!doc) {
+        closeDeleteConfirmModal();
+        return;
+    }
+
+    const confirmBtn = document.getElementById('btn-confirm-delete');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="inline-block animate-spin mr-1">↻</span> Deleting...';
+    }
+
+    const fileHash = doc.fileHash;
+    const docId = doc.id;
+    let storagePath = doc.storagePath;
+    if (!storagePath && isLoggedIn && currentUser && currentUser.id && fileHash) {
+        storagePath = `${currentUser.id}/${fileHash}.pdf`;
+    }
+
+    // 1. If signed in, delete from Supabase (user_saved_insights, user_documents, storage)
+    if (isLoggedIn && currentUser && currentUser.id) {
+        const sb = getSupabase();
+        if (sb) {
+            try {
+                // Delete user_saved_insights for this paper
+                if (fileHash) {
+                    const { error: insErr } = await sb
+                        .from('user_saved_insights')
+                        .delete()
+                        .eq('user_id', currentUser.id)
+                        .eq('file_hash', fileHash);
+                    if (insErr) console.warn('Error deleting user_saved_insights from Supabase:', insErr.message);
+                }
+
+                // Delete user_documents linking this paper
+                if (fileHash) {
+                    const { error: docErr } = await sb
+                        .from('user_documents')
+                        .delete()
+                        .eq('user_id', currentUser.id)
+                        .eq('file_hash', fileHash);
+                    if (docErr) console.warn('Error deleting user_documents from Supabase:', docErr.message);
+                }
+
+                // Remove PDF from user storage bucket if exists
+                if (storagePath) {
+                    const { error: stErr } = await sb.storage.from('papers').remove([storagePath]);
+                    if (stErr) console.warn('Error removing file from storage bucket:', stErr.message);
+                }
+            } catch (err) {
+                console.error('Supabase delete document error:', err);
+            }
+        }
+    }
+
+    // 2. Remove associated items from local userSavedInsights array
+    if (typeof userSavedInsights !== 'undefined' && Array.isArray(userSavedInsights)) {
+        userSavedInsights = userSavedInsights.filter(i => {
+            if (fileHash && i.file_hash === fileHash) return false;
+            if (docId && i.file_hash === docId) return false;
+            return true;
+        });
+    }
+
+    // 3. Remove document from hubDocuments array
+    hubDocuments = hubDocuments.filter(d => d.id !== docId && (!fileHash || d.fileHash !== fileHash));
+
+    // 4. If open in reader tabs, close the tab
+    if (typeof openTabs !== 'undefined' && Array.isArray(openTabs)) {
+        const matchingTab = openTabs.find(t => t.id === docId || (fileHash && t.fileHash === fileHash));
+        if (matchingTab) {
+            if (typeof closeReaderTab === 'function') {
+                closeReaderTab(null, matchingTab.id);
+            } else {
+                openTabs = openTabs.filter(t => t.id !== matchingTab.id);
+                if (activeTabId === matchingTab.id) {
+                    closeSmartReader();
+                }
+            }
+        }
+    }
+
+    // 5. Re-render UI views
+    renderHubDocuments();
+    if (typeof renderStarredInsightsView === 'function') {
+        renderStarredInsightsView();
+    }
+    if (typeof updateStarButtonsUI === 'function') {
+        updateStarButtonsUI();
+    }
+
+    closeDeleteConfirmModal();
+    showHubToast('Paper and associated starred content removed.');
 }
 
 // =====================================================================
@@ -880,7 +1265,7 @@ function renderDrawerPapersList() {
                     <span class="w-2.5 h-2.5 rounded-full ${isActive ? 'bg-readitGreen shadow-[0_0_8px_rgba(118,184,67,0.8)]' : 'bg-white/30'} shrink-0"></span>
                     <div class="truncate flex-1 min-w-0">
                         <div class="text-xs font-semibold ${isActive ? 'text-white' : 'text-white/80'} truncate flex items-center gap-1.5">
-                            <span class="truncate">${tab.title}</span>
+                            <span class="truncate">${escapeHtml(tab.title)}</span>
                             <span class="text-[9px] font-monoFeature px-1.5 py-0.5 rounded bg-white/10 text-white/60 shrink-0">#${idx + 1}</span>
                         </div>
                         <div class="text-[10px] text-white/50">${tab.pageCount || 1} Pages • PDF Document</div>
@@ -1068,9 +1453,9 @@ function renderReaderTabs() {
                  ondragend="handleTabDragEnd(event)"
                  onclick="switchReaderTab('${tab.id}')" 
                  class="reader-tab ${isActive ? 'active-tab' : ''}" 
-                 title="${tab.fullTitle || tab.title} (Drag left/right to reorder)">
+                 title="${escapeHtml(tab.fullTitle || tab.title)} (Drag left/right to reorder)">
                 <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-readitGreen' : 'bg-white/30'} shrink-0 reader-tab-indicator pointer-events-none"></span>
-                <span class="truncate max-w-[130px] sm:max-w-[170px] pointer-events-none">${tab.title}</span>
+                <span class="truncate max-w-[130px] sm:max-w-[170px] pointer-events-none">${escapeHtml(tab.title)}</span>
                 <button onclick="closeReaderTab(event, '${tab.id}')" 
                         class="reader-tab-close focus:outline-none" 
                         title="Close tab">
@@ -1241,7 +1626,8 @@ function openDocumentInTab(doc) {
             file: doc.file,
             pageCount: doc.pageCount || 1,
             prebakeContext: doc.prebakeContext || null,
-            storagePath: doc.storagePath || null
+            storagePath: doc.storagePath || null,
+            isDemo: doc.isDemo || false
         });
         activeTabId = doc.id;
     }
@@ -1267,24 +1653,43 @@ async function openSmartReader(docIdentifier) {
     if (!targetDoc) return;
 
     // If document is stored in cloud and hasn't been downloaded locally yet
-    if (targetDoc.isCloudOnly && targetDoc.storagePath && !targetDoc.fileUrl) {
+    const effectiveStoragePath = targetDoc.storagePath || (targetDoc.isDemo ? null : (currentUser && targetDoc.fileHash ? `${currentUser.id}/${targetDoc.fileHash}.pdf` : null));
+    if (targetDoc.isCloudOnly && effectiveStoragePath && !targetDoc.fileUrl) {
         const sb = getSupabase();
+        let downloadedBlob = null;
         if (sb) {
-            showHubToast('Downloading paper from cloud storage...');
+            showHubToast(targetDoc.isDemo ? 'Opening demo paper from Supabase...' : 'Downloading paper from cloud storage...');
             try {
-                const { data: blob, error } = await sb.storage.from('papers').download(targetDoc.storagePath);
-                if (blob) {
-                    targetDoc.file = blob;
-                    targetDoc.fileUrl = URL.createObjectURL(blob);
-                    targetDoc.isCloudOnly = false;
-                } else {
-                    showHubToast('Could not download paper: ' + (error ? error.message : 'Not found'));
-                    return;
+                const { data: blob, error } = await sb.storage.from('papers').download(effectiveStoragePath);
+                if (blob && !error) {
+                    downloadedBlob = blob;
+                } else if (error) {
+                    console.warn('Storage download error:', error.message);
                 }
             } catch (err) {
-                showHubToast('Download failed: ' + err.message);
-                return;
+                console.warn('Storage download error:', err);
             }
+        }
+
+        // Offline or fallback to static asset for demo paper
+        if (!downloadedBlob && targetDoc.demoFallbackUrl) {
+            try {
+                const res = await fetch(targetDoc.demoFallbackUrl);
+                if (res.ok) {
+                    downloadedBlob = await res.blob();
+                }
+            } catch (fetchErr) {
+                console.warn('Demo fallback fetch error:', fetchErr);
+            }
+        }
+
+        if (downloadedBlob) {
+            targetDoc.file = downloadedBlob;
+            targetDoc.fileUrl = URL.createObjectURL(downloadedBlob);
+            targetDoc.isCloudOnly = false;
+        } else {
+            showHubToast('Could not load paper. Please check connection.');
+            return;
         }
     }
 
@@ -1358,6 +1763,7 @@ function renderActiveTabDocument() {
     if (tab.fileUrl) {
         loadPdfDocument(tab.fileUrl);
     }
+    updateStarButtonsUI();
 }
 
 // =====================================================================
@@ -1370,7 +1776,7 @@ window.READIT_SYSTEM = {
     activeCardData: null,
     paperContext: null,
     currentPage: 1,
-    currentLang: 'en',
+    currentLang: currentReaderLang,
     activeFeature: 'translating_idea',
     featureCache: {},
     copyPayloads: {}
@@ -1397,7 +1803,10 @@ function isSuspiciousTitle(t) {
 
 async function loadUserLibraryFromSupabase() {
     const sb = getSupabase();
-    if (!sb || !isLoggedIn || !currentUser) return;
+    if (!sb || !isLoggedIn || !currentUser) {
+        await loadDemoPaper();
+        return;
+    }
 
     try {
         const { data, error } = await sb
@@ -1447,7 +1856,9 @@ async function loadUserLibraryFromSupabase() {
                         pageCount: docMeta.page_count || 1,
                         lastReadPage: item.last_read_page || 1,
                         progressPct: item.progress_pct || 0,
-                        storagePath: docMeta.storage_path,
+                        storagePath: (docMeta.is_demo_file || (docMeta.storage_path && docMeta.storage_path.startsWith('demo/')))
+                            ? docMeta.storage_path
+                            : `${currentUser.id}/${hash}.pdf`,
                         prebakeContext: docMeta.prebake_context,
                         isCloudOnly: true
                     });
@@ -1464,6 +1875,8 @@ async function loadUserLibraryFromSupabase() {
         }
     } catch (e) {
         console.warn('loadUserLibraryFromSupabase error:', e);
+    } finally {
+        await loadDemoPaper();
     }
 }
 
@@ -1506,7 +1919,7 @@ async function saveNewDocumentToCloud(doc, file, parsedData) {
         // 2. Upsert public.documents (prebake context cached for everyone!)
         const docRecord = {
             file_hash: fileHash,
-            storage_path: storagePath,
+            storage_path: doc.isDemo ? storagePath : null, // Prevent user UUID leakage in public catalog
             title: finalTitle,
             authors: parsedData.author ? [parsedData.author] : [],
             doi: parsedData.doi || null,
@@ -1643,19 +2056,28 @@ async function resolveDocumentPrebake(doc) {
     // 1. Check Supabase database first for existing prebake!
     if (sb && fileHash) {
         try {
-            const { data, error } = await sb
-                .from('documents')
-                .select('file_hash, title, authors, doi, page_count, prebake_context, storage_path')
-                .eq('file_hash', fileHash)
-                .maybeSingle();
+            let existingDoc = null;
+            const { data: rpcData, error: rpcErr } = await sb.rpc('lookup_document_prebake', { hash_input: fileHash });
+            if (!rpcErr && rpcData && rpcData.length > 0) {
+                existingDoc = rpcData[0];
+            } else {
+                const { data, error } = await sb
+                    .from('documents')
+                    .select('file_hash, title, authors, doi, page_count, prebake_context, storage_path')
+                    .eq('file_hash', fileHash)
+                    .maybeSingle();
+                if (!error && data) {
+                    existingDoc = data;
+                }
+            }
 
-            if (!error && data && data.prebake_context) {
+            if (existingDoc && existingDoc.prebake_context) {
                 console.log('⚡ Found existing prebake in Supabase for hash:', fileHash);
-                window.READIT_SYSTEM.paperContext = data.prebake_context;
-                doc.prebakeContext = data.prebake_context;
+                window.READIT_SYSTEM.paperContext = existingDoc.prebake_context;
+                doc.prebakeContext = existingDoc.prebake_context;
 
-                const prebakeTitle = (data.prebake_context && data.prebake_context.title) || '';
-                let effectiveTitle = data.title || '';
+                const prebakeTitle = (existingDoc.prebake_context && existingDoc.prebake_context.title) || '';
+                let effectiveTitle = existingDoc.title || '';
                 if (isSuspiciousTitle(effectiveTitle) && prebakeTitle && !isSuspiciousTitle(prebakeTitle)) {
                     effectiveTitle = prebakeTitle;
                 }
@@ -1669,13 +2091,13 @@ async function resolveDocumentPrebake(doc) {
                 if (label) {
                     label.textContent = 'Context: Ready (Cached)';
                     if (pill) {
-                        const ctx = data.prebake_context;
+                        const ctx = existingDoc.prebake_context;
                         pill.title = `Domain: ${ctx.domain || 'N/A'}\nCore Problem: ${ctx.core_problem || 'N/A'}\nMethod: ${ctx.core_method || 'N/A'}`;
                     }
                 }
 
-                if (isLoggedIn && currentUser) {
-                    await syncUserDocumentToCloud(doc, fileHash, data.storage_path);
+                if (isLoggedIn && currentUser && !doc.isDemo) {
+                    await syncUserDocumentToCloud(doc, fileHash, existingDoc.storage_path);
                 }
                 doc.isResolvingPrebake = false;
                 return;
@@ -1742,7 +2164,7 @@ async function resolveDocumentPrebake(doc) {
         }
 
         // 3. If logged in, upload PDF to Supabase Storage and cache prebake in Supabase DB
-        if (isLoggedIn && currentUser && sb) {
+        if (isLoggedIn && currentUser && sb && !doc.isDemo) {
             await saveNewDocumentToCloud(doc, file, parsedData);
         }
     } catch (parseErr) {
@@ -2296,6 +2718,7 @@ function resetInspector() {
         badge.className = 'text-xs font-semibold uppercase tracking-wider text-white/50';
     }
     if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-white/30';
+    updateStarButtonsUI(window.READIT_SYSTEM.activeFeature);
 }
 
 function copyCurrentSelection() {
@@ -2316,13 +2739,17 @@ function copyCurrentSelection() {
 // =====================================================================
 function toggleReaderLang() {
     const nextLang = (currentReaderLang === 'en') ? 'id' : 'en';
-    setReaderLang(nextLang);
+    setReaderLang(nextLang, true);
+    showHubToast(`Switched breakdown language to ${nextLang === 'id' ? 'Bahasa Indonesia' : 'Simple English'}`);
 }
 
-function setReaderLang(lang) {
+async function setReaderLang(lang, shouldPersist = true) {
     if (!['en', 'id'].includes(lang)) return;
     currentReaderLang = lang;
-    window.READIT_SYSTEM.currentLang = lang;
+    if (window.READIT_SYSTEM) {
+        window.READIT_SYSTEM.currentLang = lang;
+    }
+    localStorage.setItem('readit_target_language', lang);
 
     const floatEn = document.getElementById('floating-lang-en');
     const floatId = document.getElementById('floating-lang-id');
@@ -2370,14 +2797,40 @@ function setReaderLang(lang) {
         document.getElementById('label-why-cited')?.replaceChildren(document.createTextNode('Alasan Penulis Mengutip Rujukan Ini'));
     }
 
-    const data = window.READIT_SYSTEM.activeCardData || window.READIT_SYSTEM.pendingSelection;
-    if (window.READIT_SYSTEM.activeCard && data && data.text) {
-        const feature = window.READIT_SYSTEM.activeFeature;
-        const cacheKey = `${feature}_${lang}`;
-        if (window.READIT_SYSTEM.featureCache[cacheKey]) {
-            renderFeatureOutput(feature, window.READIT_SYSTEM.featureCache[cacheKey]);
-        } else {
-            executeFeatureLens(feature, data);
+    // Persist to Supabase public.user_preferences if requested and logged in
+    if (shouldPersist && isLoggedIn && currentUser && currentUser.id) {
+        const sb = getSupabase();
+        if (sb) {
+            try {
+                sb.from('user_preferences')
+                    .upsert({
+                        user_id: currentUser.id,
+                        target_language: lang,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' })
+                    .then(({ error }) => {
+                        if (error) console.warn('Failed to persist user_preferences:', error.message);
+                        else console.log('✅ Language preference persisted to Supabase:', lang);
+                    });
+            } catch (err) {
+                console.warn('Error in setReaderLang persistence:', err);
+            }
+        }
+    }
+
+    if (window.READIT_SYSTEM) {
+        const data = window.READIT_SYSTEM.activeCardData || window.READIT_SYSTEM.pendingSelection;
+        if (window.READIT_SYSTEM.activeCard && data && data.text) {
+            const feature = window.READIT_SYSTEM.activeFeature;
+            const cacheKey = `${feature}_${lang}`;
+            if (window.READIT_SYSTEM.featureCache[cacheKey]) {
+                renderFeatureOutput(feature, window.READIT_SYSTEM.featureCache[cacheKey]);
+            } else {
+                executeFeatureLens(feature, data);
+            }
+        }
+        if (typeof updateStarButtonsUI === 'function') {
+            updateStarButtonsUI(window.READIT_SYSTEM.activeFeature);
         }
     }
 }
@@ -2420,6 +2873,7 @@ function switchFeatureDrawer(feature) {
             executeFeatureLens(feature, data);
         }
     }
+    updateStarButtonsUI(feature);
 }
 
 async function triggerCurrentFeatureAction() {
@@ -2678,6 +3132,7 @@ function renderFeatureOutput(feature, result) {
         if (errorEl) errorEl.classList.add('hidden');
     }
 
+    updateStarButtonsUI(feature);
     renderBottomDrawerContent(feature, result);
     triggerExplanationBump(feature);
 }
@@ -2709,6 +3164,335 @@ function copyDrawerContent(feature) {
             setTimeout(() => { label.textContent = original; }, 1500);
         }
     });
+}
+
+// =====================================================================
+// SUPABASE SAVED INSIGHTS (STAR / BOOKMARK) CONTROLLER
+// Persisted in public.user_saved_insights (with local fallback)
+// =====================================================================
+let userSavedInsights = [];
+
+function updateStarButtonsVisibility(show) {
+    const shouldShow = (typeof show === 'boolean') ? show : (isLoggedIn && !!currentUser);
+    const btns = [
+        document.getElementById('btn-star-translating_idea'),
+        document.getElementById('btn-star-quick_reference'),
+        document.getElementById('btn-star-easy_citation'),
+        document.getElementById('btn-star-bottom-drawer')
+    ];
+
+    btns.forEach(btn => {
+        if (!btn) return;
+        if (shouldShow) {
+            btn.classList.remove('hidden');
+        } else {
+            btn.classList.add('hidden');
+        }
+    });
+}
+
+function getCurrentDocumentFileHash() {
+    const activeTab = (typeof openTabs !== 'undefined' && Array.isArray(openTabs))
+        ? openTabs.find(t => t.id === activeTabId)
+        : null;
+    let hash = activeTab?.fileHash;
+    if (!hash && activeTab?.id) {
+        const hubDoc = (typeof hubDocuments !== 'undefined' && Array.isArray(hubDocuments))
+            ? hubDocuments.find(d => d.id === activeTab.id)
+            : null;
+        hash = hubDoc?.fileHash;
+    }
+    if (!hash && activeTab && (activeTab.isDemo || activeTab.id === 'demo-paper')) {
+        hash = DEMO_PAPER_CONFIG.fileHash;
+    }
+    if (!hash && window.READIT_SYSTEM?.activeDocHash) {
+        hash = window.READIT_SYSTEM.activeDocHash;
+    }
+    return hash || null;
+}
+
+async function loadUserSavedInsightsFromSupabase() {
+    if (!isLoggedIn || !currentUser) {
+        userSavedInsights = [];
+        updateStarButtonsVisibility(false);
+        updateStarButtonsUI();
+        return;
+    }
+
+    updateStarButtonsVisibility(true);
+
+    const sb = getSupabase();
+    if (!sb) return;
+
+    try {
+        const { data, error } = await sb
+            .from('user_saved_insights')
+            .select('*')
+            .eq('user_id', currentUser.id);
+
+        if (error) {
+            console.warn('Error loading user_saved_insights from Supabase:', error.message);
+            return;
+        }
+
+        userSavedInsights = data || [];
+        updateStarButtonsUI();
+        if (typeof currentHubTab !== 'undefined' && currentHubTab === 'starred') {
+            renderStarredInsightsView();
+        }
+    } catch (err) {
+        console.warn('Failed to load user_saved_insights:', err);
+    }
+}
+
+function isExplanationStarred(feature) {
+    if (!isLoggedIn || !currentUser) return false;
+    const feat = feature || window.READIT_SYSTEM?.activeFeature || 'translating_idea';
+    const text = (window.READIT_SYSTEM?.selectedText || window.READIT_SYSTEM?.activeCardData?.text || '').trim();
+    if (!text) return false;
+
+    const fileHash = getCurrentDocumentFileHash();
+    if (!fileHash) return false;
+
+    const normText = text.replace(/\s+/g, ' ');
+    return userSavedInsights.some(item =>
+        item.user_id === currentUser.id &&
+        item.file_hash === fileHash &&
+        item.lens_type === feat &&
+        (item.selected_text || '').trim().replace(/\s+/g, ' ') === normText
+    );
+}
+
+async function toggleStarExplanation(feature, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+    }
+
+    if (!isLoggedIn || !currentUser) {
+        updateStarButtonsVisibility(false);
+        openAuthModal('signin');
+        return;
+    }
+
+    const sb = getSupabase();
+    if (!sb) {
+        showHubToast('Database connection unavailable');
+        return;
+    }
+
+    const feat = feature || window.READIT_SYSTEM?.activeFeature || 'translating_idea';
+    const lang = window.READIT_SYSTEM?.currentLang || 'en';
+    const isID = lang === 'id';
+    const selectedText = (window.READIT_SYSTEM?.selectedText || window.READIT_SYSTEM?.activeCardData?.text || '').trim();
+
+    if (!selectedText) {
+        showHubToast(isID ? 'Pilih teks terlebih dahulu untuk menyimpan penjelasan' : 'Select text first to star explanation');
+        return;
+    }
+
+    let fileHash = getCurrentDocumentFileHash();
+    const activeTab = (typeof openTabs !== 'undefined' && Array.isArray(openTabs))
+        ? openTabs.find(t => t.id === activeTabId)
+        : null;
+
+    if (!fileHash && activeTab?.file) {
+        fileHash = await computeFileSha256(activeTab.file);
+        activeTab.fileHash = fileHash;
+    }
+
+    if (!fileHash) {
+        showHubToast(isID ? 'Hash berkas tidak ditemukan' : 'Document file hash not found');
+        return;
+    }
+
+    const pageNum = (typeof currentPageNum === 'number' && currentPageNum > 0)
+        ? currentPageNum
+        : (activeTab?.lastReadPage || 1);
+
+    const normText = selectedText.replace(/\s+/g, ' ');
+    const existingIndex = userSavedInsights.findIndex(item =>
+        item.user_id === currentUser.id &&
+        item.file_hash === fileHash &&
+        item.lens_type === feat &&
+        (item.selected_text || '').trim().replace(/\s+/g, ' ') === normText
+    );
+
+    if (existingIndex >= 0) {
+        // DELETE FROM SUPABASE
+        const existingItem = userSavedInsights[existingIndex];
+        // Optimistic UI update
+        userSavedInsights.splice(existingIndex, 1);
+        updateStarButtonsUI(feat);
+        if (typeof currentHubTab !== 'undefined' && currentHubTab === 'starred') {
+            renderStarredInsightsView();
+        }
+        showHubToast(isID ? 'Dihapus dari Bintang' : 'Removed from Starred');
+
+        try {
+            let deleteQuery = sb.from('user_saved_insights').delete();
+            if (existingItem.id && typeof existingItem.id === 'string' && !existingItem.id.startsWith('temp-')) {
+                deleteQuery = deleteQuery.eq('id', existingItem.id);
+            } else {
+                deleteQuery = deleteQuery
+                    .eq('user_id', currentUser.id)
+                    .eq('file_hash', fileHash)
+                    .eq('lens_type', feat)
+                    .eq('selected_text', selectedText);
+            }
+
+            const { error: deleteError } = await deleteQuery;
+            if (deleteError) {
+                console.warn('Failed to delete saved insight from Supabase:', deleteError.message);
+                // Rollback optimistic update
+                userSavedInsights.splice(existingIndex, 0, existingItem);
+                updateStarButtonsUI(feat);
+                if (typeof currentHubTab !== 'undefined' && currentHubTab === 'starred') {
+                    renderStarredInsightsView();
+                }
+                showHubToast('Error removing insight: ' + deleteError.message);
+            }
+        } catch (err) {
+            console.error('Delete insight error:', err);
+            userSavedInsights.splice(existingIndex, 0, existingItem);
+            updateStarButtonsUI(feat);
+            if (typeof currentHubTab !== 'undefined' && currentHubTab === 'starred') {
+                renderStarredInsightsView();
+            }
+        }
+    } else {
+        // INSERT INTO SUPABASE
+        const cacheKey = `${feat}_${lang}`;
+        const cachedResult = window.READIT_SYSTEM?.featureCache?.[cacheKey] || {};
+        const formattedCopy = window.READIT_SYSTEM?.copyPayloads?.[feat] || '';
+        const docTitle = activeTab?.title || 'Document';
+
+        const insightData = {
+            feature: feat,
+            language: lang,
+            doc_title: docTitle,
+            formatted_text: formattedCopy,
+            result: cachedResult,
+            saved_at: new Date().toISOString()
+        };
+
+        const newRecord = {
+            user_id: currentUser.id,
+            file_hash: fileHash,
+            page_number: pageNum,
+            selected_text: selectedText,
+            lens_type: feat,
+            insight_data: insightData
+        };
+
+        // Temporary optimistic entry
+        const tempId = 'temp-' + Date.now();
+        const optimisticItem = { ...newRecord, id: tempId, created_at: new Date().toISOString() };
+        userSavedInsights.unshift(optimisticItem);
+        updateStarButtonsUI(feat);
+        if (typeof currentHubTab !== 'undefined' && currentHubTab === 'starred') {
+            renderStarredInsightsView();
+        }
+        showHubToast(isID ? '⭐ Penjelasan disimpan ke Bintang!' : '⭐ Explanation saved to Starred!');
+
+        try {
+            // Defensive: ensure documents table has an entry for file_hash to satisfy foreign key constraint
+            const { data: docExists } = await sb
+                .from('documents')
+                .select('file_hash')
+                .eq('file_hash', fileHash)
+                .maybeSingle();
+
+            if (!docExists) {
+                await sb.from('documents').upsert({
+                    file_hash: fileHash,
+                    title: docTitle,
+                    page_count: totalPages || 1,
+                    last_accessed_at: new Date().toISOString()
+                }, { onConflict: 'file_hash' });
+            }
+
+            const { data: insertedData, error: insertError } = await sb
+                .from('user_saved_insights')
+                .insert(newRecord)
+                .select()
+                .single();
+
+            if (insertError) {
+                console.warn('Failed to insert saved insight to Supabase:', insertError.message);
+                const idx = userSavedInsights.findIndex(i => i.id === tempId);
+                if (idx >= 0) userSavedInsights.splice(idx, 1);
+                updateStarButtonsUI(feat);
+                showHubToast('Error saving insight: ' + insertError.message);
+            } else if (insertedData) {
+                const idx = userSavedInsights.findIndex(i => i.id === tempId);
+                if (idx >= 0) {
+                    userSavedInsights[idx] = insertedData;
+                }
+            }
+        } catch (err) {
+            console.error('Insert insight error:', err);
+            const idx = userSavedInsights.findIndex(i => i.id === tempId);
+            if (idx >= 0) userSavedInsights.splice(idx, 1);
+            updateStarButtonsUI(feat);
+        }
+    }
+}
+
+function updateStarButtonsUI(feature) {
+    if (!isLoggedIn || !currentUser) {
+        updateStarButtonsVisibility(false);
+        return;
+    }
+
+    updateStarButtonsVisibility(true);
+
+    const feat = feature || window.READIT_SYSTEM?.activeFeature || 'translating_idea';
+    const isID = window.READIT_SYSTEM?.currentLang === 'id';
+    const currentActiveFeatureStarred = isExplanationStarred(feat);
+
+    const btnMap = {
+        'translating_idea': { btn: 'btn-star-translating_idea', label: 'star-idea-label' },
+        'quick_reference': { btn: 'btn-star-quick_reference', label: 'star-quickref-label' },
+        'easy_citation': { btn: 'btn-star-easy_citation', label: 'star-citation-label' }
+    };
+
+    // Update desktop buttons
+    Object.keys(btnMap).forEach(f => {
+        const item = btnMap[f];
+        const btn = document.getElementById(item.btn);
+        const lbl = document.getElementById(item.label);
+        const starred = isExplanationStarred(f);
+
+        if (btn) {
+            if (starred) {
+                btn.classList.add('star-btn-active');
+                btn.setAttribute('title', isID ? 'Hapus dari Bintang' : 'Remove from Starred');
+            } else {
+                btn.classList.remove('star-btn-active');
+                btn.setAttribute('title', isID ? 'Simpan ke Bintang' : 'Save / Star this breakdown');
+            }
+        }
+        if (lbl) {
+            lbl.textContent = starred ? (isID ? 'Tersimpan' : 'Saved') : (isID ? 'Bintang' : 'Star');
+        }
+    });
+
+    // Update mobile drawer star button
+    const mobileBtn = document.getElementById('btn-star-bottom-drawer');
+    const mobileLbl = document.getElementById('star-bottom-drawer-label');
+    if (mobileBtn) {
+        if (currentActiveFeatureStarred) {
+            mobileBtn.classList.add('star-btn-active');
+            mobileBtn.setAttribute('title', isID ? 'Hapus dari Bintang' : 'Remove from Starred');
+        } else {
+            mobileBtn.classList.remove('star-btn-active');
+            mobileBtn.setAttribute('title', isID ? 'Simpan ke Bintang' : 'Save / Star this breakdown');
+        }
+    }
+    if (mobileLbl) {
+        mobileLbl.textContent = currentActiveFeatureStarred ? (isID ? 'Tersimpan' : 'Saved') : (isID ? 'Bintang' : 'Star');
+    }
 }
 
 function escapeHtml(str) {
@@ -3088,6 +3872,7 @@ function renderBottomDrawerContent(feature, result) {
             `;
         }
     }
+    updateStarButtonsUI(feature);
 }
 
 let isDraggingDrawer = false;
@@ -3314,34 +4099,257 @@ function triggerPaperPageTurn(delta, direction) {
 }
 
 // Left Sidebar Tab Switcher
+let currentHubTab = 'my-docs';
+
 function switchHubTab(tab) {
     if (tab === 'shared-docs' && !isLoggedIn) {
         openAuthModal('signin', 'Sign in to access shared research documents.');
         return;
     }
 
-    const tabs = ['my-docs', 'shared-docs', 'resources'];
+    currentHubTab = tab || 'my-docs';
+
+    const tabs = ['my-docs', 'shared-docs', 'starred'];
     tabs.forEach(t => {
         const btn = document.getElementById(`hub-nav-${t}`);
         if (!btn) return;
-        if (t === tab) {
+        if (t === currentHubTab) {
             btn.className = "sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-medium border border-white/70 text-white bg-white/[0.05] transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation";
+            const icon = btn.querySelector('svg');
+            if (icon) {
+                if (t === 'starred') icon.className = "w-4 h-4 shrink-0 text-amber-400";
+                else icon.className = "w-4 h-4 shrink-0 text-readitGreen";
+            }
         } else {
             btn.className = "sidebar-nav-btn w-full py-2.5 px-4 rounded-full text-[13.5px] font-normal border border-white/[0.12] text-white/40 hover:text-white/80 hover:border-white/30 transition flex items-center gap-3 focus:outline-none min-h-[44px] touch-manipulation";
+            const icon = btn.querySelector('svg');
+            if (icon) icon.className = "w-4 h-4 shrink-0 text-white/50";
         }
     });
 
     closeSmartReader();
+
+    const recentSection = document.getElementById('hub-recent-section');
+    const starredSection = document.getElementById('hub-starred-section');
     const heading = document.getElementById('hub-section-heading');
-    if (heading) {
-        if (tab === 'my-docs') {
-            heading.textContent = 'Recent Document';
-        } else if (tab === 'shared-docs') {
-            heading.textContent = 'Shared Document';
-        } else {
-            heading.textContent = 'Academic Lexicon Resources';
+
+    if (currentHubTab === 'starred') {
+        if (recentSection) recentSection.classList.add('hidden');
+        if (starredSection) starredSection.classList.remove('hidden');
+        renderStarredInsightsView();
+    } else {
+        if (starredSection) starredSection.classList.add('hidden');
+        if (recentSection) recentSection.classList.remove('hidden');
+
+        if (heading) {
+            if (currentHubTab === 'my-docs') {
+                heading.textContent = 'Recent Document';
+            } else if (currentHubTab === 'shared-docs') {
+                heading.textContent = 'Shared Document';
+            }
         }
     }
+}
+
+function renderStarredInsightsView() {
+    const grid = document.getElementById('hub-starred-grid');
+    const badge = document.getElementById('starred-count-badge');
+    if (!grid) return;
+
+    if (!isLoggedIn || !currentUser) {
+        if (badge) badge.textContent = '0';
+        grid.innerHTML = `
+            <div class="col-span-full py-16 px-4 flex flex-col items-center justify-center text-center">
+                <div class="w-14 h-14 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center mb-4 text-2xl">
+                    🔒
+                </div>
+                <h3 class="text-sm sm:text-base font-semibold text-white mb-1.5">Sign In to View Starred Insights</h3>
+                <p class="text-xs text-white/50 max-w-sm mb-5 leading-relaxed">
+                    Bookmark key sentence breakdowns, core ideas, and cited references across your papers and sync them to your account.
+                </p>
+                <button onclick="openAuthModal('signin')" class="px-5 py-2.5 rounded-full bg-readitGreen text-black text-xs font-semibold shadow-md hover:bg-emerald-400 transition active:scale-95">
+                    Sign in to READit
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    if (badge) badge.textContent = String(userSavedInsights.length);
+
+    if (userSavedInsights.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full py-16 px-4 flex flex-col items-center justify-center text-center">
+                <div class="w-14 h-14 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mb-4 text-2xl">
+                    ⭐
+                </div>
+                <h3 class="text-sm sm:text-base font-semibold text-white mb-1.5">No Starred Insights Yet</h3>
+                <p class="text-xs text-white/50 max-w-sm mb-5 leading-relaxed">
+                    While reading papers in the Smart Reader, click the Star (★) button on any Core Idea, Quick Reference, or Easy Citation breakdown to save it here.
+                </p>
+                <button onclick="switchHubTab('my-docs')" class="px-4 py-2 rounded-full bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold border border-white/15 transition">
+                    Browse My Documents
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = userSavedInsights.map(item => {
+        const feat = item.lens_type || 'translating_idea';
+        let badgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+        let lensIcon = '⚡';
+        let lensLabel = 'Core Idea';
+
+        if (feat === 'quick_reference') {
+            badgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            lensIcon = '🔍';
+            lensLabel = 'Quick Ref';
+        } else if (feat === 'easy_citation') {
+            badgeClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+            lensIcon = '📚';
+            lensLabel = 'Easy Citation';
+        }
+
+        const data = item.insight_data || {};
+        const docTitle = data.doc_title || 'Research Document';
+        const pageNum = item.page_number || 1;
+        const selectedText = item.selected_text || '';
+        const createdDate = item.created_at
+            ? new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Saved';
+
+        let explanationHtml = '';
+        if (data.result) {
+            const res = data.result;
+            if (feat === 'translating_idea') {
+                const action = res.core_action || '';
+                const meaning = res.plain_meaning || '';
+                explanationHtml = `
+                    ${action ? `<div class="text-[11px] font-medium text-emerald-300 leading-snug"><span class="text-white/40">Action:</span> ${escapeHtml(action)}</div>` : ''}
+                    ${meaning ? `<div class="text-xs text-white/85 leading-relaxed font-sans line-clamp-3">${escapeHtml(meaning)}</div>` : ''}
+                `;
+            } else if (feat === 'quick_reference') {
+                const subject = res.real_subject || '';
+                const rewrite = res.active_rewrite || '';
+                explanationHtml = `
+                    ${subject ? `<div class="text-[11px] font-medium text-amber-300 leading-snug"><span class="text-white/40">Subject:</span> ${escapeHtml(subject)}</div>` : ''}
+                    ${rewrite ? `<div class="text-xs text-white/85 leading-relaxed font-sans line-clamp-3">${escapeHtml(rewrite)}</div>` : ''}
+                `;
+            } else if (feat === 'easy_citation') {
+                const title = res.reference_title || '';
+                const claim = res.supporting_claim || '';
+                explanationHtml = `
+                    ${title ? `<div class="text-[11px] font-medium text-sky-300 leading-snug"><span class="text-white/40">Ref:</span> ${escapeHtml(title)}</div>` : ''}
+                    ${claim ? `<div class="text-xs text-white/85 leading-relaxed font-sans line-clamp-3">${escapeHtml(claim)}</div>` : ''}
+                `;
+            }
+        }
+        if (!explanationHtml && data.formatted_text) {
+            explanationHtml = `<div class="text-xs text-white/85 leading-relaxed font-sans line-clamp-4 whitespace-pre-line">${escapeHtml(data.formatted_text)}</div>`;
+        }
+
+        return `
+            <div class="rounded-2xl bg-[#1C1C1C] border border-white/10 hover:border-amber-400/40 p-4 transition-all duration-200 flex flex-col justify-between space-y-3 shadow-lg group">
+                <div class="space-y-2.5">
+                    <!-- Top Bar: Badge, Document & Actions -->
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-monoFeature font-semibold uppercase tracking-wider border ${badgeClass} shrink-0">
+                                ${lensIcon} ${lensLabel}
+                            </span>
+                            <span class="text-[11px] text-white/50 truncate" title="${escapeHtml(docTitle)}">
+                                ${escapeHtml(docTitle)} • p.${pageNum}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="copySingleStarredInsight('${item.id}', event)" class="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.08] transition" title="Copy breakdown">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                </svg>
+                            </button>
+                            <button onclick="removeSingleStarredInsight('${item.id}', event)" class="p-1.5 rounded-lg text-amber-400 hover:text-red-400 hover:bg-white/[0.08] transition" title="Remove from Starred">
+                                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Selected Passage (Quote) -->
+                    <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/80 italic font-sans line-clamp-3">
+                        “${escapeHtml(selectedText)}”
+                    </div>
+
+                    <!-- Breakdown Output -->
+                    <div class="space-y-1.5">
+                        ${explanationHtml}
+                    </div>
+                </div>
+
+                <!-- Footer / Open Paper Action -->
+                <div class="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-white/40">
+                    <span>${createdDate}</span>
+                    <button onclick="openPaperAtInsight('${item.file_hash}', ${pageNum}, event)" class="inline-flex items-center gap-1.5 text-readitGreen hover:text-white font-medium transition focus:outline-none">
+                        <span>Read on Page ${pageNum}</span>
+                        <span>→</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function copySingleStarredInsight(insightId, event) {
+    if (event) event.stopPropagation();
+    const item = userSavedInsights.find(i => i.id === insightId);
+    if (!item) return;
+    const data = item.insight_data || {};
+    const textToCopy = data.formatted_text || (data.result ? JSON.stringify(data.result, null, 2) : item.selected_text);
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        showHubToast('Copied insight to clipboard!');
+    });
+}
+
+async function removeSingleStarredInsight(insightId, event) {
+    if (event) event.stopPropagation();
+    const existingIndex = userSavedInsights.findIndex(i => i.id === insightId);
+    if (existingIndex < 0) return;
+
+    const existingItem = userSavedInsights[existingIndex];
+    userSavedInsights.splice(existingIndex, 1);
+    renderStarredInsightsView();
+    updateStarButtonsUI();
+    showHubToast('Removed from Starred');
+
+    const sb = getSupabase();
+    if (sb) {
+        try {
+            await sb.from('user_saved_insights').delete().eq('id', insightId);
+        } catch (err) {
+            console.warn('Failed to delete insight:', err);
+        }
+    }
+}
+
+async function openPaperAtInsight(fileHash, pageNum, event) {
+    if (event) event.stopPropagation();
+    let targetDoc = hubDocuments.find(d => d.fileHash === fileHash || d.id === fileHash);
+    if (!targetDoc && fileHash === DEMO_PAPER_CONFIG.fileHash) {
+        targetDoc = hubDocuments.find(d => d.isDemo);
+    }
+    const sb = getSupabase();
+    if (!targetDoc && sb && isLoggedIn && currentUser) {
+        showHubToast('Opening paper from cloud library...');
+        await loadUserLibraryFromSupabase();
+        targetDoc = hubDocuments.find(d => d.fileHash === fileHash);
+    }
+    if (!targetDoc) {
+        showHubToast('Document not found in current library');
+        return;
+    }
+    targetDoc.lastReadPage = pageNum || 1;
+    await openSmartReader(targetDoc.id);
 }
 
 function toggleRecentDocumentsGrid() {
@@ -3401,44 +4409,94 @@ function openAccountModal(type) {
     const modal = document.getElementById('hub-account-modal');
     const title = document.getElementById('account-modal-title');
     const body = document.getElementById('account-modal-body');
+    const saveBtn = document.getElementById('btn-save-account-modal');
     if (!modal || !title || !body) return;
+
+    const currentName = currentUser ? (currentUser.name || '') : (localStorage.getItem('readit_guest_name') || 'Guest Scholar');
+    const currentLang = currentReaderLang || 'en';
 
     if (type === 'settings') {
         title.textContent = 'Account Settings';
+        if (saveBtn) {
+            saveBtn.textContent = 'Save Changes';
+            saveBtn.onclick = saveAccountModal;
+            saveBtn.classList.remove('hidden');
+        }
         body.innerHTML = `
-            <div class="space-y-3">
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-[11px] text-white/50 mb-1">Display Name</label>
-                    <input type="text" value="${currentUser ? currentUser.name : 'Nama Akun'}" class="w-full px-3 py-2 rounded-lg bg-[#1A1A1A] border border-white/15 text-white text-xs focus:outline-none focus:border-readitGreen" />
+                    <label class="block text-[11px] font-medium text-white/70 mb-1.5">Display Name</label>
+                    <input type="text" id="setting-display-name" value="${escapeHtml(currentName)}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#1A1A1A] border border-white/15 text-white text-xs placeholder-white/30 focus:outline-none focus:border-readitGreen transition-colors" placeholder="Enter your display name" />
+                    <p class="text-[10px] text-white/40 mt-1">This name will be displayed in your profile and remembered across devices.</p>
                 </div>
-                <div class="flex items-center justify-between p-3 rounded-lg bg-[#1A1A1A] border border-white/10">
+                <div>
+                    <label class="block text-[11px] font-medium text-white/70 mb-1.5">Default Breakdown Language</label>
+                    <select id="setting-target-language" class="w-full px-3.5 py-2.5 rounded-xl bg-[#1A1A1A] border border-white/15 text-white text-xs focus:outline-none focus:border-readitGreen transition-colors">
+                        <option value="en" ${currentLang === 'en' ? 'selected' : ''}>Simple English (EN)</option>
+                        <option value="id" ${currentLang === 'id' ? 'selected' : ''}>Bahasa Indonesia (ID)</option>
+                    </select>
+                    <p class="text-[10px] text-white/40 mt-1">All new papers and sentence breakdowns will generate in this language by default.</p>
+                </div>
+                <div class="flex items-center justify-between p-3.5 rounded-xl bg-[#1A1A1A] border border-white/10">
                     <div>
-                        <div class="font-medium text-white">Current Plan</div>
-                        <div class="text-[11px] text-white/50">Free Academic Tier (Unlimited Local Lookups)</div>
+                        <div class="font-medium text-white text-xs">Current Plan</div>
+                        <div class="text-[11px] text-white/50">${isLoggedIn ? 'Academic Community (Unlimited Local Lookups)' : 'Guest Mode (Client-Side Only)'}</div>
                     </div>
-                    <span class="px-2.5 py-0.5 rounded-full bg-readitGreen/20 text-readitGreen font-semibold text-[10px]">Active</span>
+                    <span class="px-2.5 py-0.5 rounded-full bg-readitGreen/20 text-readitGreen font-semibold text-[10px]">${isLoggedIn ? 'Active' : 'Local'}</span>
                 </div>
             </div>
         `;
+        setTimeout(() => {
+            const input = document.getElementById('setting-display-name');
+            if (input) {
+                input.focus();
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveAccountModal();
+                    }
+                });
+            }
+        }, 50);
     } else if (type === 'preference') {
         title.textContent = 'Reading Preference';
+        if (saveBtn) {
+            saveBtn.textContent = 'Save Changes';
+            saveBtn.onclick = saveAccountModal;
+            saveBtn.classList.remove('hidden');
+        }
         body.innerHTML = `
-            <div class="space-y-3">
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-[11px] text-white/50 mb-1.5">Default Breakdown Language</label>
-                    <select onchange="setReaderLang(this.value)" class="w-full px-3 py-2 rounded-lg bg-[#1A1A1A] border border-white/15 text-white text-xs focus:outline-none">
-                        <option value="en" ${currentReaderLang === 'en' ? 'selected' : ''}>Simple English (EN)</option>
-                        <option value="id" ${currentReaderLang === 'id' ? 'selected' : ''}>Bahasa Indonesia (ID)</option>
+                    <label class="block text-[11px] font-medium text-white/70 mb-1.5">Default Breakdown Language</label>
+                    <select id="setting-target-language" class="w-full px-3.5 py-2.5 rounded-xl bg-[#1A1A1A] border border-white/15 text-white text-xs focus:outline-none focus:border-readitGreen transition-colors">
+                        <option value="en" ${currentLang === 'en' ? 'selected' : ''}>Simple English (EN)</option>
+                        <option value="id" ${currentLang === 'id' ? 'selected' : ''}>Bahasa Indonesia (ID)</option>
                     </select>
+                    <p class="text-[10px] text-white/40 mt-1">All sentence translations, core actions, and syntax breakdowns will generate in this language.</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-[#1A1A1A] border border-white/10 text-white/60 text-[11px] leading-relaxed">
+                    ${isLoggedIn
+                        ? '✨ Preferences automatically sync to your Supabase account and follow you across devices.'
+                        : '💡 Sign in to sync your preferred language and reading library across devices.'}
                 </div>
             </div>
         `;
     } else {
         title.textContent = 'Privacy and Policy';
+        if (saveBtn) {
+            saveBtn.textContent = 'Close';
+            saveBtn.onclick = closeAccountModal;
+        }
         body.innerHTML = `
-            <p class="leading-relaxed text-white/70">
-                READit processes uploaded academic PDFs locally in your browser session and only sends individual inspected sentences (plus background context anchors) to generate plain-language breakdowns. Your manuscripts are never used to train external models.
-            </p>
+            <div class="space-y-3 leading-relaxed text-white/70">
+                <p>
+                    READit processes uploaded academic PDFs locally in your browser session and only sends individual inspected sentences (plus background context anchors) to generate plain-language breakdowns.
+                </p>
+                <p>
+                    When signed in, your uploaded papers are saved privately to your personal storage bucket so you can resume reading across devices. Your manuscripts are never used to train external models.
+                </p>
+            </div>
         `;
     }
 
@@ -3450,9 +4508,85 @@ function closeAccountModal() {
     if (modal) modal.classList.add('hidden');
 }
 
-function saveAccountModal() {
+async function saveAccountModal() {
+    const nameInput = document.getElementById('setting-display-name');
+    const langSelect = document.getElementById('setting-target-language');
+    const saveBtn = document.getElementById('btn-save-account-modal');
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="inline-block animate-spin mr-1">↻</span> Saving...';
+    }
+
+    let nameUpdated = false;
+    let langUpdated = false;
+    const sb = getSupabase();
+
+    // 1. Handle Display Name Update
+    if (nameInput) {
+        const newName = nameInput.value.trim();
+        if (newName && (!currentUser || currentUser.name !== newName)) {
+            nameUpdated = true;
+            if (currentUser) {
+                currentUser.name = newName;
+                currentUser.displayName = newName;
+                localStorage.setItem('readit_user', JSON.stringify(currentUser));
+            } else {
+                localStorage.setItem('readit_guest_name', newName);
+            }
+            updateAccountUI();
+
+            if (isLoggedIn && currentUser && currentUser.id && sb) {
+                try {
+                    // Update Supabase Auth user metadata
+                    await sb.auth.updateUser({
+                        data: {
+                            full_name: newName,
+                            name: newName,
+                            display_name: newName
+                        }
+                    });
+
+                    // Update public.users record
+                    await sb.from('users')
+                        .update({ display_name: newName })
+                        .eq('id', currentUser.id);
+
+                    console.log('✅ Display name updated in Supabase auth and public.users:', newName);
+                } catch (err) {
+                    console.warn('Error saving display name to Supabase:', err);
+                }
+            }
+        }
+    }
+
+    // 2. Handle Default Language Preference Update
+    if (langSelect) {
+        const newLang = langSelect.value;
+        if (['en', 'id'].includes(newLang)) {
+            if (currentReaderLang !== newLang) {
+                langUpdated = true;
+            }
+            await setReaderLang(newLang, true);
+        }
+    }
+
     closeAccountModal();
-    showHubToast('Preferences saved');
+
+    if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+    }
+
+    if (nameUpdated && langUpdated) {
+        showHubToast('Name and language preferences saved');
+    } else if (nameUpdated) {
+        showHubToast('Display name updated');
+    } else if (langUpdated) {
+        showHubToast(`Default language set to ${currentReaderLang === 'id' ? 'Bahasa Indonesia' : 'Simple English'}`);
+    } else {
+        showHubToast('Preferences saved');
+    }
 }
 
 function showHubToast(msg) {
@@ -3470,9 +4604,11 @@ function showHubToast(msg) {
 // GLOBAL INITIALIZATION & KEYBOARD LISTENERS
 // =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
+    setReaderLang(currentReaderLang, false);
     initAccountState();
     initSidebarState();
     initGlobalDragAndDrop();
+    loadDemoPaper();
     renderHubDocuments();
     setTimeout(initGoogleIdentity, 600);
     setupDrawerTouchGestures();
@@ -3608,5 +4744,17 @@ window.saveNewDocumentToCloud = saveNewDocumentToCloud;
 window.syncUserDocumentToCloud = syncUserDocumentToCloud;
 window.loadUserLibraryFromSupabase = loadUserLibraryFromSupabase;
 window.computeFileSha256 = computeFileSha256;
-
-
+window.loadDemoPaper = loadDemoPaper;
+window.toggleStarExplanation = toggleStarExplanation;
+window.updateStarButtonsUI = updateStarButtonsUI;
+window.isExplanationStarred = isExplanationStarred;
+window.updateStarButtonsVisibility = updateStarButtonsVisibility;
+window.loadUserSavedInsightsFromSupabase = loadUserSavedInsightsFromSupabase;
+window.getCurrentDocumentFileHash = getCurrentDocumentFileHash;
+window.renderStarredInsightsView = renderStarredInsightsView;
+window.copySingleStarredInsight = copySingleStarredInsight;
+window.removeSingleStarredInsight = removeSingleStarredInsight;
+window.openPaperAtInsight = openPaperAtInsight;
+window.promptDeleteDocument = promptDeleteDocument;
+window.closeDeleteConfirmModal = closeDeleteConfirmModal;
+window.confirmDeleteDocument = confirmDeleteDocument;

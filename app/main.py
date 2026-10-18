@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -93,9 +93,54 @@ async def reader():
     return RedirectResponse(url="/hub", status_code=307)
 
 
-@app.get("/test-reconstruct", response_class=HTMLResponse)
-async def test_reconstruct_page(request: Request):
-    """Serve the isolated PDF re-rendering and paragraph extraction sandbox."""
-    return templates.TemplateResponse(request=request, name="test_reconstruct.html")
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def robots():
+    """Serve search engine robots indexing instructions."""
+    content = """User-agent: *
+Allow: /
+Allow: /hub
+Disallow: /api/
+
+# Block aggressive AI training scrapers (Consent policy)
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+Sitemap: https://readit.id/sitemap.xml
+"""
+    return PlainTextResponse(content=content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    """Serve XML sitemap for search engines."""
+    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://readit.id/</loc>
+        <lastmod>2026-10-18</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://readit.id/hub</loc>
+        <lastmod>2026-10-18</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
+    </url>
+</urlset>
+"""
+    return Response(content=xml_content, media_type="application/xml")
 
 
