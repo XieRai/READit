@@ -453,16 +453,48 @@ function triggerPendingUploadsIfAny() {
     }
 }
 
-function initGoogleIdentity() {
-    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '';
-    if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
+async function generateNonce() {
     try {
-        window.google.accounts.id.initialize({
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        const rawNonce = btoa(String.fromCharCode(...array))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        const encoder = new TextEncoder();
+        const encodedNonce = encoder.encode(rawNonce);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', encodedNonce);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashedNonce = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+        return { rawNonce, hashedNonce };
+    } catch (e) {
+        console.warn('Nonce generation error, proceeding without nonce:', e);
+        return { rawNonce: null, hashedNonce: null };
+    }
+}
+
+async function initGoogleIdentity() {
+    const clientId = (window.ENV && window.ENV.GOOGLE_CLIENT_ID) || '';
+    if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) return;
+    try {
+        const { rawNonce, hashedNonce } = await generateNonce();
+        if (rawNonce) {
+            sessionStorage.setItem('google-raw-nonce', rawNonce);
+        }
+
+        const config = {
             client_id: clientId,
             callback: handleGoogleCredentialResponse,
             auto_select: false,
             cancel_on_tap_outside: true
-        });
+        };
+        if (hashedNonce) {
+            config.nonce = hashedNonce;
+        }
+
+        window.google.accounts.id.initialize(config);
     } catch (e) {
         console.warn('Google Identity initialization error:', e);
     }
@@ -474,13 +506,21 @@ async function handleGoogleCredentialResponse(response) {
     if (sb) {
         showHubToast('Signing in with Google...');
         try {
-            const { data, error } = await sb.auth.signInWithIdToken({
+            const rawNonce = sessionStorage.getItem('google-raw-nonce');
+            sessionStorage.removeItem('google-raw-nonce');
+
+            const payload = {
                 provider: 'google',
                 token: response.credential
-            });
+            };
+            if (rawNonce) {
+                payload.nonce = rawNonce;
+            }
+
+            const { data, error } = await sb.auth.signInWithIdToken(payload);
             if (error) {
-                console.warn('signInWithIdToken note:', error);
-                showHubToast(`Google sign-in: ${error.message}`);
+                console.warn('signInWithIdToken note, falling back to OAuth redirect:', error);
+                fallbackToOAuthRedirect(sb);
                 return;
             }
             if (data && data.user) {
@@ -490,7 +530,8 @@ async function handleGoogleCredentialResponse(response) {
                 triggerPendingUploadsIfAny();
             }
         } catch (err) {
-            console.error('Google ID token authentication error:', err);
+            console.error('Google ID token authentication error, falling back to OAuth:', err);
+            fallbackToOAuthRedirect(sb);
         }
     }
 }
